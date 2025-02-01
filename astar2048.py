@@ -217,10 +217,6 @@ class Game2048:
             if new_row != original:  # Ensure actual movement occurred
                 self.grid[i] = new_row
                 moved = True
-                print(
-                    f"Move executed: {original} → {new_row}"
-                )  # Print only if movement happened
-
         return moved
 
     def move_columns(self, compress_fn, merge_fn):

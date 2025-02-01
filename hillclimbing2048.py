@@ -140,98 +140,27 @@ class Game2048:
         return sum(row.count(0) for row in self.grid)
 
     # ...existing code...
-
-    def minimax(
-        self,
-        depth: int,
-        alpha: int,
-        beta: int,
-        maximizing_player: bool,
-        test_grid: List[List[int]],
-    ) -> int:
-        # First check if we've reached max depth
-        if depth == 0:
-            return self.evaluate()
-
-        original_grid = self.grid
+    def get_best_move(self) -> Optional[Callable]:
+        """Get the best move using Hill Climbing algorithm."""
+        best_move = None
+        best_score = float("-inf")
+        current_grid = self.clone_grid()
         original_score = self.score
-        self.grid = test_grid
 
-        # Check if no moves are possible in the current position
-        possible_moves = self.get_possible_moves(test_grid)
-        if not possible_moves and not any(0 in row for row in test_grid):
-            self.grid = original_grid
+        for move in self.get_possible_moves(current_grid):
+            temp_grid = copy.deepcopy(current_grid)
+            temp_score = self.score
+            self.grid = temp_grid
+            move()
+            score = self.evaluate()
+            if score > best_score:
+                best_score = score
+                best_move = move
             self.score = original_score
-            return self.evaluate()
 
-        if maximizing_player:
-            max_eval = float("-inf")
-            for move in possible_moves:
-                temp_grid = copy.deepcopy(test_grid)
-                self.grid = temp_grid
-                move()
-                eval = self.minimax(depth - 1, alpha, beta, False, self.grid)
-                max_eval = max(max_eval, eval)
-                alpha = max(alpha, eval)
-                if beta <= alpha:
-                    break
-            self.score = original_score
-            self.grid = original_grid
-            return max_eval
-        else:
-            min_eval = float("inf")
-            empty_cells = [
-                (i, j)
-                for i in range(GRID_SIZE)
-                for j in range(GRID_SIZE)
-                if test_grid[i][j] == 0
-            ]
-            if not empty_cells:
-                self.grid = original_grid
-                self.score = original_score
-                return self.evaluate()
-
-            for i, j in empty_cells:
-                for new_value in NEW_TILE_VALUES:
-                    temp_grid = copy.deepcopy(test_grid)
-                    temp_grid[i][j] = new_value
-                    eval = self.minimax(depth - 1, alpha, beta, True, temp_grid)
-                    min_eval = min(min_eval, eval)
-                    beta = min(beta, eval)
-                    if beta <= alpha:
-                        break
-
-            self.grid = original_grid
-            self.score = original_score
-            return min_eval
-
-    # ...existing code...
-
-    def get_best_move(self, depth: int = 3) -> Optional[Callable]:
-        try:
-            best_move = None
-            max_eval = float("-inf")
-            current_grid = self.clone_grid()
-            original_score = self.score
-
-            for move in self.get_possible_moves(current_grid):
-                temp_grid = copy.deepcopy(current_grid)
-                temp_score = self.score
-                self.grid = temp_grid
-                move()
-                eval = self.minimax(
-                    depth - 1, float("-inf"), float("inf"), False, self.grid
-                )
-                if eval > max_eval:
-                    max_eval = eval
-                    best_move = move
-                self.score = original_score
-            self.grid = current_grid
-            self.score = original_score
-            return best_move
-        except Exception as e:
-            print(f"Error in get_best_move: {e}")
-            return None
+        self.grid = current_grid
+        self.score = original_score
+        return best_move
 
     def schedule_ai_move(self):
         """Schedule the next AI move if the game is still running."""
