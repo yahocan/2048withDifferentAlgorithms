@@ -165,7 +165,6 @@ class Game2048:
             max_eval = float("-inf")
             for move in possible_moves:
                 temp_grid = copy.deepcopy(test_grid)
-                temp_score = self.score
                 self.grid = temp_grid
                 move()
                 eval = self.minimax(depth - 1, False, self.grid)
