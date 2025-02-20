@@ -133,6 +133,7 @@ class Game2048:
 
         self.score = original_score
         self.grid = original_grid
+
         return moves
 
     def evaluate(self) -> int:
