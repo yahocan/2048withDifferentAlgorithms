@@ -2,6 +2,8 @@ import tkinter as tk
 import random
 import copy
 from typing import Callable, List, Optional, Tuple
+import pyautogui
+from PIL import Image, ImageDraw, ImageFont
 
 GRID_SIZE = 4
 NEW_TILE_VALUES = [2, 4]
@@ -24,22 +26,51 @@ FONT = ("Verdana", 24, "bold")
 
 
 class Game2048:
-    def __init__(self):
-        self.window = tk.Tk()
-        self.window.title("2048")
-        self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
+    def __init__(self, run_without_gui=False):
+        self.run_without_gui = run_without_gui
         self.grid = [[0] * GRID_SIZE for _ in range(GRID_SIZE)]
         self.cells = []
         self.score = 0
         self.game_running = True
-        self.init_gui()
-        self.start_game()
-        self.ai_task = None
-        self.schedule_ai_move()
-        self.window.mainloop()
+        self.move_count = 0  # Add a counter for moves
+        self.screenshot_taken = False  # Flag to check if screenshot is taken
+
+        if not run_without_gui:
+            self.window = tk.Tk()
+            self.window.title("2048")
+            self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
+            self.init_gui()
+            self.start_game()
+            self.ai_task = None
+            self.schedule_ai_move()
+            self.window.mainloop()
+        else:
+            self.start_game()
+
+    def run(self):
+        """Run the game without GUI and return final score and max tile."""
+        if not self.run_without_gui:
+            return self.score, max(max(row) for row in self.grid)
+
+        # Run the game until game over
+        while self.can_move():
+            best_move = self.get_best_move()
+            if best_move:
+                best_move()
+                self.add_new_tile()
+                self.move_count += 1
+            else:
+                break
+
+        # Find the max tile value
+        max_tile = max(max(row) for row in self.grid)
+        return self.score, max_tile
 
     def init_gui(self):
         """Initialize the game's graphical user interface."""
+        if self.run_without_gui:
+            return
+
         try:
             self.frame = tk.Frame(self.window, bg=BACKGROUND_COLOR)
             self.frame.grid()
@@ -102,6 +133,9 @@ class Game2048:
 
     def update_gui(self):
         """Update the GUI to reflect the current game state."""
+        if self.run_without_gui:
+            return
+
         try:
             for i in range(GRID_SIZE):
                 for j in range(GRID_SIZE):
@@ -137,18 +171,138 @@ class Game2048:
         return moves
 
     def evaluate(self) -> int:
-        """Evaluate the current board position."""
-        return sum(row.count(0) for row in self.grid)
+        """Evaluate the current board position using multiple heuristics."""
+        # Heuristic ağırlıkları analiz sonuçlarına göre güncellendi
+        empty_cell_score = sum(row.count(0) for row in self.grid) * 200  # 100'den 200'e
+        monotonicity_score = self._calculate_monotonicity() / 5  # 1/20'den 1/5'e
+        smoothness_score = self._calculate_smoothness() * 2  # 8'den 2'ye
+        max_tile_placement_score = self._evaluate_max_tile_placement() * 5  # 15'ten 5'e
 
-    # ...existing code...
+        # Merge potansiyeli daha belirgin hale getirildi
+        merge_potential = self._calculate_merge_potential() * 10  # 5'ten 10'a
+
+        return (
+            empty_cell_score
+            + monotonicity_score
+            + smoothness_score
+            + max_tile_placement_score
+            + merge_potential
+        )
+
+    def _calculate_merge_potential(self) -> float:
+        """Calculate the potential for merging tiles on the board."""
+        merge_score = 0
+
+        # Check horizontal merge potential
+        for i in range(GRID_SIZE):
+            for j in range(GRID_SIZE - 1):
+                if self.grid[i][j] != 0 and self.grid[i][j] == self.grid[i][j + 1]:
+                    merge_score += self.grid[i][j] * 2  # Value after merge
+
+        # Check vertical merge potential
+        for i in range(GRID_SIZE - 1):
+            for j in range(GRID_SIZE):
+                if self.grid[i][j] != 0 and self.grid[i][j] == self.grid[i + 1][j]:
+                    merge_score += self.grid[i][j] * 2  # Value after merge
+
+        return merge_score
+
+    def _calculate_monotonicity(self) -> float:
+        """Calculate how monotonic (ordered) the grid is."""
+        mono_score = 0
+
+        # Check horizontal monotonicity (decreasing from left to right)
+        for i in range(GRID_SIZE):
+            for j in range(GRID_SIZE - 1):
+                if self.grid[i][j] and self.grid[i][j + 1]:
+                    if self.grid[i][j] >= self.grid[i][j + 1]:
+                        mono_score += self.grid[i][j]
+
+        # Check vertical monotonicity (decreasing from top to bottom)
+        for j in range(GRID_SIZE):
+            for i in range(GRID_SIZE - 1):
+                if self.grid[i][j] and self.grid[i + 1][j]:
+                    if self.grid[i][j] >= self.grid[i + 1][j]:
+                        mono_score += self.grid[i][j]
+
+        return mono_score
+
+    def _calculate_smoothness(self) -> float:
+        """Calculate the smoothness of the grid (difference between adjacent tiles)."""
+        smoothness = 0
+
+        for i in range(GRID_SIZE):
+            for j in range(GRID_SIZE):
+                if self.grid[i][j] != 0:
+                    if j < GRID_SIZE - 1 and self.grid[i][j + 1] != 0:
+                        smoothness -= abs(self.grid[i][j] - self.grid[i][j + 1])
+                    if i < GRID_SIZE - 1 and self.grid[i + 1][j] != 0:
+                        smoothness -= abs(self.grid[i][j] - self.grid[i + 1][j])
+
+        return smoothness
+
+    def _evaluate_max_tile_placement(self) -> int:
+        """Evaluate the position of the maximum tile on the grid."""
+        max_val = 0
+        max_i, max_j = 0, 0
+
+        # Find the maximum tile value and its position
+        for i in range(GRID_SIZE):
+            for j in range(GRID_SIZE):
+                if self.grid[i][j] > max_val:
+                    max_val = self.grid[i][j]
+                    max_i, max_j = i, j
+
+        # Check if the max tile is in a corner (best position)
+        corner_positions = [
+            (0, 0),
+            (0, GRID_SIZE - 1),
+            (GRID_SIZE - 1, 0),
+            (GRID_SIZE - 1, GRID_SIZE - 1),
+        ]
+        if (max_i, max_j) in corner_positions:
+            return max_val  # Maximum score for corner placement
+
+        # Check if it's on an edge
+        if max_i == 0 or max_i == GRID_SIZE - 1 or max_j == 0 or max_j == GRID_SIZE - 1:
+            return max_val // 2  # Half score for edge placement
+
+        return 0  # No bonus for center placement
+
     def get_best_move(self) -> Optional[Callable]:
-        """Get the best move using Hill Climbing algorithm."""
+        """Get the best move using Hill Climbing algorithm with random restart."""
         best_move = None
         best_score = float("-inf")
         current_grid = self.clone_grid()
         original_score = self.score
 
-        for move in self.get_possible_moves(current_grid):
+        # Rastgele yeniden başlatma oranını %10'dan %15'e yükselttik
+        # Bu sayede daha fazla hamle çeşitliliği ve yerel maksimumlara takılmama sağlanacak
+        use_random = random.random() < 0.15
+
+        possible_moves = self.get_possible_moves(current_grid)
+
+        if use_random and possible_moves:
+            # Rastgele bir hamle seçerken bile biraz akıllı davran - tamamen rastgele değil
+            # Moves'ları evaluate et ve en iyiden sonraki ilk 2 hareket arasından rastgele seç
+            # Bu şekilde hem araştırma hem de optimizasyon dengelenmiş olur
+            move_scores = []
+            for move in possible_moves:
+                temp_grid = copy.deepcopy(current_grid)
+                temp_score = self.score
+                self.grid = temp_grid
+                move()
+                score = self.evaluate()
+                move_scores.append((move, score))
+                self.score = original_score
+
+            # En iyi 2 hamleyi al ve rastgele birini seç
+            move_scores.sort(key=lambda x: x[1], reverse=True)
+            top_moves = move_scores[: min(2, len(move_scores))]
+            return random.choice([m[0] for m in top_moves])
+
+        # Normal hill climbing işlemi
+        for move in possible_moves:
             temp_grid = copy.deepcopy(current_grid)
             temp_score = self.score
             self.grid = temp_grid
@@ -165,11 +319,35 @@ class Game2048:
 
     def schedule_ai_move(self):
         """Schedule the next AI move if the game is still running."""
+        if self.run_without_gui:
+            return
+
         if self.game_running:
             self.ai_task = self.window.after(50, self.ai_play)
 
+    def take_screenshot(self, filename: str, text: str):
+        """Take a screenshot of the game window and add text."""
+        if self.run_without_gui:
+            return
+
+        x, y, width, height = (
+            self.window.winfo_rootx(),
+            self.window.winfo_rooty(),
+            self.window.winfo_width(),
+            self.window.winfo_height(),
+        )
+        screenshot = pyautogui.screenshot(region=(x, y, width, height))
+        screenshot = screenshot.convert("RGB")
+        draw = ImageDraw.Draw(screenshot)
+        font = ImageFont.truetype("arial.ttf", 36)
+        draw.text((10, 50), text, fill="black", font=font)
+        screenshot.save(filename)
+
     def ai_play(self):
         """Execute AI move and schedule the next one if the game is still running."""
+        if self.run_without_gui:
+            return
+
         if self.game_running and self.can_move():
             try:
                 best_move = self.get_best_move()
@@ -177,6 +355,15 @@ class Game2048:
                     best_move()
                     self.add_new_tile()
                     self.update_gui()
+
+                    self.move_count += 1  # Increment move counter
+
+                    # Take a screenshot after a certain number of moves
+                    if self.move_count == 70 and not self.screenshot_taken:
+                        self.take_screenshot(
+                            "game_mid_hillclimbing.png", "Hill Climbing Algorithm"
+                        )
+                        self.screenshot_taken = True
 
                     if not self.can_move():
                         self.game_over()
@@ -273,6 +460,9 @@ class Game2048:
         return False
 
     def game_over(self):
+        if self.run_without_gui:
+            return
+
         self.game_running = False
         try:
             game_over_label = tk.Label(
@@ -284,6 +474,9 @@ class Game2048:
             game_over_label.grid(
                 row=GRID_SIZE + 1, column=0, columnspan=GRID_SIZE
             )  # Place below the grid
+            self.take_screenshot(
+                "game_over_hillclimbing.png", "Hill Climbing Algorithm"
+            )  # Take screenshot on game over
         except tk.TclError as e:
             print(f"Error displaying game over: {e}")
 

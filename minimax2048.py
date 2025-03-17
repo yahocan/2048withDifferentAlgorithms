@@ -2,6 +2,12 @@ import tkinter as tk
 import random
 import copy
 from typing import Callable, List, Optional, Tuple
+import pyautogui
+from PIL import Image, ImageDraw, ImageFont
+from functools import lru_cache
+import time
+import multiprocessing
+from multiprocessing import Pool
 
 GRID_SIZE = 4
 NEW_TILE_VALUES = [2, 4]
@@ -24,22 +30,51 @@ FONT = ("Verdana", 24, "bold")
 
 
 class Game2048:
-    def __init__(self):
-        self.window = tk.Tk()
-        self.window.title("2048")
-        self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
+    def __init__(self, run_without_gui=False):
+        self.run_without_gui = run_without_gui
         self.grid = [[0] * GRID_SIZE for _ in range(GRID_SIZE)]
         self.cells = []
         self.score = 0
         self.game_running = True
-        self.init_gui()
-        self.start_game()
-        self.ai_task = None
-        self.schedule_ai_move()
-        self.window.mainloop()
+        self.move_count = 0  # Add a counter for moves
+        self.screenshot_taken = False  # Flag to check if screenshot is taken
+
+        if not run_without_gui:
+            self.window = tk.Tk()
+            self.window.title("2048")
+            self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
+            self.init_gui()
+            self.start_game()
+            self.ai_task = None
+            self.schedule_ai_move()
+            self.window.mainloop()
+        else:
+            self.start_game()
+
+    def run(self):
+        """Run the game without GUI and return final score and max tile."""
+        if not self.run_without_gui:
+            return self.score, max(max(row) for row in self.grid)
+
+        # Run the game until game over
+        while self.can_move():
+            best_move = self.get_best_move()
+            if best_move:
+                best_move()
+                self.add_new_tile()
+                self.move_count += 1
+            else:
+                break
+
+        # Find the max tile value
+        max_tile = max(max(row) for row in self.grid)
+        return self.score, max_tile
 
     def init_gui(self):
         """Initialize the game's graphical user interface."""
+        if self.run_without_gui:
+            return
+
         try:
             self.frame = tk.Frame(self.window, bg=BACKGROUND_COLOR)
             self.frame.grid()
@@ -102,6 +137,9 @@ class Game2048:
 
     def update_gui(self):
         """Update the GUI to reflect the current game state."""
+        if self.run_without_gui:
+            return
+
         try:
             for i in range(GRID_SIZE):
                 for j in range(GRID_SIZE):
@@ -136,45 +174,241 @@ class Game2048:
         return moves
 
     def evaluate(self) -> int:
-        """Evaluate the current board position."""
-        return sum(row.count(0) for row in self.grid)
+        """Evaluate the current board position using multiple heuristics."""
+        # Base heuristic: empty cell count
+        empty_cell_score = sum(row.count(0) for row in self.grid) * 100
 
-    # ...existing code...
+        # New heuristics
+        monotonicity_score = self._calculate_monotonicity() / 10
+        smoothness_score = self._calculate_smoothness() * 5
+        clustering_score = self._calculate_clustering() / 50
+        max_tile_placement_score = self._evaluate_max_tile_placement() * 15
+
+        return (
+            empty_cell_score
+            + monotonicity_score
+            + smoothness_score
+            + clustering_score
+            + max_tile_placement_score
+        )
+
+    def _calculate_monotonicity(self) -> float:
+        """Calculate how monotonic (ordered) the grid is."""
+        mono_score = 0
+
+        # Check horizontal monotonicity (decreasing from left to right)
+        for i in range(GRID_SIZE):
+            for j in range(GRID_SIZE - 1):
+                if self.grid[i][j] and self.grid[i][j + 1]:
+                    if self.grid[i][j] >= self.grid[i][j + 1]:
+                        mono_score += self.grid[i][j]
+
+        # Check vertical monotonicity (decreasing from top to bottom)
+        for j in range(GRID_SIZE):
+            for i in range(GRID_SIZE - 1):
+                if self.grid[i][j] and self.grid[i + 1][j]:
+                    if self.grid[i][j] >= self.grid[i + 1][j]:
+                        mono_score += self.grid[i][j]
+
+        return mono_score
+
+    def _calculate_smoothness(self) -> float:
+        """Calculate the smoothness of the grid (difference between adjacent tiles)."""
+        smoothness = 0
+
+        for i in range(GRID_SIZE):
+            for j in range(GRID_SIZE):
+                if self.grid[i][j] != 0:
+                    if j < GRID_SIZE - 1 and self.grid[i][j + 1] != 0:
+                        smoothness -= abs(self.grid[i][j] - self.grid[i][j + 1])
+                    if i < GRID_SIZE - 1 and self.grid[i + 1][j] != 0:
+                        smoothness -= abs(self.grid[i][j] - self.grid[i + 1][j])
+
+        return smoothness
+
+    def _calculate_clustering(self) -> float:
+        """Calculate how well large tiles are clustered together."""
+        clustering_score = 0
+
+        # Find the mean position of tiles weighted by their values
+        total_value = 0
+        weighted_x_sum = 0
+        weighted_y_sum = 0
+
+        for i in range(GRID_SIZE):
+            for j in range(GRID_SIZE):
+                if self.grid[i][j] > 0:
+                    total_value += self.grid[i][j]
+                    weighted_x_sum += j * self.grid[i][j]
+                    weighted_y_sum += i * self.grid[i][j]
+
+        if total_value > 0:
+            mean_x = weighted_x_sum / total_value
+            mean_y = weighted_y_sum / total_value
+
+            # Calculate distance from each tile to the mean position
+            for i in range(GRID_SIZE):
+                for j in range(GRID_SIZE):
+                    if self.grid[i][j] > 0:
+                        # Higher values for larger tiles that are closer to the center of mass
+                        distance = ((i - mean_y) ** 2 + (j - mean_x) ** 2) ** 0.5
+                        clustering_score += self.grid[i][j] / (1 + distance)
+
+        return clustering_score
+
+    def _evaluate_max_tile_placement(self) -> int:
+        """Evaluate the position of the maximum tile on the grid."""
+        max_val = 0
+        max_i, max_j = 0, 0
+
+        # Find the maximum tile value and its position
+        for i in range(GRID_SIZE):
+            for j in range(GRID_SIZE):
+                if self.grid[i][j] > max_val:
+                    max_val = self.grid[i][j]
+                    max_i, max_j = i, j
+
+        # Check if the max tile is in a corner (best position)
+        corner_positions = [
+            (0, 0),
+            (0, GRID_SIZE - 1),
+            (GRID_SIZE - 1, 0),
+            (GRID_SIZE - 1, GRID_SIZE - 1),
+        ]
+        if (max_i, max_j) in corner_positions:
+            return max_val  # Maximum score for corner placement
+
+        # Check if it's on an edge
+        if max_i == 0 or max_i == GRID_SIZE - 1 or max_j == 0 or max_j == GRID_SIZE - 1:
+            return max_val // 2  # Half score for edge placement
+
+        return 0  # No bonus for center placement
+
+    def is_terminal(self, grid: List[List[int]]) -> bool:
+        """Check if the grid is in a terminal state (no moves possible)."""
+        # Check for empty cells
+        if any(0 in row for row in grid):
+            return False
+
+        # Check for possible merges horizontally
+        for i in range(GRID_SIZE):
+            for j in range(GRID_SIZE - 1):
+                if grid[i][j] == grid[i][j + 1]:
+                    return False
+
+        # Check for possible merges vertically
+        for i in range(GRID_SIZE - 1):
+            for j in range(GRID_SIZE):
+                if grid[i][j] == grid[i + 1][j]:
+                    return False
+
+        return True  # No moves possible
+
+    def evaluate_move_for_sorting(
+        self, move: Callable, test_grid: List[List[int]]
+    ) -> float:
+        """Evaluate a move quickly for move ordering purposes."""
+        temp_grid = copy.deepcopy(test_grid)
+        original_grid = self.grid
+        self.grid = temp_grid
+
+        # Perform the move
+        move()
+
+        # Quick heuristic: prefer more empty cells and higher scores
+        empty_count = sum(row.count(0) for row in self.grid)
+        max_value = max(max(row) for row in self.grid)
+        corner_score = self._evaluate_max_tile_placement()
+
+        # Restore original grid
+        self.grid = original_grid
+
+        return empty_count * 10 + max_value + corner_score
+
+    def get_sorted_moves(self, test_grid: List[List[int]]) -> List[Callable]:
+        """Get possible moves sorted by heuristic evaluation (best first)."""
+        possible_moves = self.get_possible_moves(test_grid)
+
+        # Sort moves by a quick evaluation (best first)
+        return sorted(
+            possible_moves,
+            key=lambda move: self.evaluate_move_for_sorting(move, test_grid),
+            reverse=True,
+        )
+
+    def grid_to_tuple(self, grid: List[List[int]]) -> Tuple[Tuple[int, ...], ...]:
+        """Convert grid to hashable tuple format for memoization."""
+        return tuple(tuple(row) for row in grid)
+
+    # Cached version of minimax with lru_cache for memoization
+    @lru_cache(maxsize=1000)  # 10000'den 1000'e düşürüldü
+    def cached_minimax(
+        self,
+        depth: int,
+        alpha: float,
+        beta: float,
+        maximizing_player: bool,
+        grid_tuple: Tuple[Tuple[int, ...], ...],
+        score: int,
+    ) -> float:
+        """Memoized version of minimax."""
+        # Convert tuple back to list
+        grid = [list(row) for row in grid_tuple]
+
+        # Save original grid and score
+        original_grid = self.grid
+        original_score = self.score
+
+        # Use test grid temporarily
+        self.grid = grid
+        self.score = score
+
+        # Run minimax
+        result = self.minimax(depth, alpha, beta, maximizing_player, self.grid)
+
+        # Restore original grid and score
+        self.grid = original_grid
+        self.score = original_score
+
+        return result
 
     def minimax(
         self,
         depth: int,
-        alpha: int,
-        beta: int,
+        alpha: float,
+        beta: float,
         maximizing_player: bool,
         test_grid: List[List[int]],
-    ) -> int:
-        # First check if we've reached max depth
-        if depth == 0:
+    ) -> float:
+        """Optimized minimax algorithm with alpha-beta pruning and early termination."""
+        # Early termination check
+        if depth == 0 or self.is_terminal(test_grid):
             return self.evaluate()
 
         original_grid = self.grid
         original_score = self.score
         self.grid = test_grid
 
-        # Check if no moves are possible in the current position
-        possible_moves = self.get_possible_moves(test_grid)
-        if not possible_moves and not any(0 in row for row in test_grid):
-            self.grid = original_grid
-            self.score = original_score
-            return self.evaluate()
-
         if maximizing_player:
             max_eval = float("-inf")
-            for move in possible_moves:
+            # Use sorted moves for better alpha-beta pruning
+            for move in self.get_sorted_moves(test_grid):
                 temp_grid = copy.deepcopy(test_grid)
                 self.grid = temp_grid
                 move()
-                eval = self.minimax(depth - 1, alpha, beta, False, self.grid)
+
+                # Use memoization for recursive calls
+                grid_tuple = self.grid_to_tuple(self.grid)
+                eval = self.cached_minimax(
+                    depth - 1, alpha, beta, False, grid_tuple, self.score
+                )
+
                 max_eval = max(max_eval, eval)
                 alpha = max(alpha, eval)
+
                 if beta <= alpha:
-                    break
+                    break  # Alpha-beta pruning
+
             self.score = original_score
             self.grid = original_grid
             return max_eval
@@ -186,60 +420,136 @@ class Game2048:
                 for j in range(GRID_SIZE)
                 if test_grid[i][j] == 0
             ]
+
             if not empty_cells:
                 self.grid = original_grid
                 self.score = original_score
                 return self.evaluate()
 
+            # Probabilistic weighting for 2 and 4 tiles
+            probabilities = {2: 0.9, 4: 0.1}
+
             for i, j in empty_cells:
                 for new_value in NEW_TILE_VALUES:
                     temp_grid = copy.deepcopy(test_grid)
                     temp_grid[i][j] = new_value
-                    eval = self.minimax(depth - 1, alpha, beta, True, temp_grid)
-                    min_eval = min(min_eval, eval)
-                    beta = min(beta, eval)
+
+                    # Weight by probability of tile appearing
+                    grid_tuple = self.grid_to_tuple(temp_grid)
+                    eval = self.cached_minimax(
+                        depth - 1, alpha, beta, True, grid_tuple, self.score
+                    )
+                    weighted_eval = eval * probabilities[new_value]
+
+                    min_eval = min(min_eval, weighted_eval)
+                    beta = min(beta, weighted_eval)
+
                     if beta <= alpha:
-                        break
+                        break  # Alpha-beta pruning
 
             self.grid = original_grid
             self.score = original_score
             return min_eval
 
-    # ...existing code...
+    def parallel_process_move(self, move, grid, depth):
+        """Modified helper function for parallel move evaluation without pickling issues."""
+        # Process a single move evaluation without passing self to multiprocessing
+        temp_grid = copy.deepcopy(grid)
 
-    def get_best_move(self, depth: int = 3) -> Optional[Callable]:
+        # Create a new instance of Game2048 just for this evaluation
+        # to avoid pickling issues with the tkinter window
+        temp_game = Game2048(run_without_gui=True)
+        temp_game.grid = temp_grid
+        temp_game.score = self.score
+
+        # Make the move
+        move_func = getattr(temp_game, move.__name__)
+        move_func()
+
+        # Evaluate using minimax directly on the temporary game
+        result = temp_game.evaluate()
+
+        return (move, result)
+
+    def get_best_move(
+        self, depth: int = 2
+    ) -> Optional[Callable]:  # derinlik 3'ten 2'ye düşürüldü
+        """Get best move using optimized minimax without parallel processing."""
         try:
             best_move = None
             max_eval = float("-inf")
             current_grid = self.clone_grid()
             original_score = self.score
+            possible_moves = self.get_sorted_moves(current_grid)
 
-            for move in self.get_possible_moves(current_grid):
+            # For now, always use sequential processing to avoid pickling errors
+            # Sequential processing
+            for move in possible_moves:
                 temp_grid = copy.deepcopy(current_grid)
                 temp_score = self.score
                 self.grid = temp_grid
                 move()
-                eval = self.minimax(
-                    depth - 1, float("-inf"), float("inf"), False, self.grid
+
+                # Use memoization
+                grid_tuple = self.grid_to_tuple(self.grid)
+                eval = self.cached_minimax(
+                    depth - 1,
+                    float("-inf"),
+                    float("inf"),
+                    False,
+                    grid_tuple,
+                    self.score,
                 )
+
                 if eval > max_eval:
                     max_eval = eval
                     best_move = move
                 self.score = original_score
+
             self.grid = current_grid
             self.score = original_score
+
+            # Periyodik olarak cache'i temizle (her 100 hamlede bir)
+            if self.move_count % 100 == 0:
+                self.cached_minimax.cache_clear()
+
             return best_move
+
         except Exception as e:
             print(f"Error in get_best_move: {e}")
             return None
 
     def schedule_ai_move(self):
         """Schedule the next AI move if the game is still running."""
+        if self.run_without_gui:
+            return
+
         if self.game_running:
             self.ai_task = self.window.after(50, self.ai_play)
 
+    def take_screenshot(self, filename: str, text: str):
+        """Take a screenshot of the game window and add text."""
+        if self.run_without_gui:
+            return
+
+        x, y, width, height = (
+            self.window.winfo_rootx(),
+            self.window.winfo_rooty(),
+            self.window.winfo_width(),
+            self.window.winfo_height(),
+        )
+        screenshot = pyautogui.screenshot(region=(x, y, width, height))
+        screenshot = screenshot.convert("RGB")
+        draw = ImageDraw.Draw(screenshot)
+        font = ImageFont.truetype("arial.ttf", 36)
+        draw.text((10, 50), text, fill="black", font=font)  # Adjusted position
+        screenshot.save(filename)
+
     def ai_play(self):
         """Execute AI move and schedule the next one if the game is still running."""
+        if self.run_without_gui:
+            return
+
         if self.game_running and self.can_move():
             try:
                 best_move = self.get_best_move()
@@ -247,6 +557,15 @@ class Game2048:
                     best_move()
                     self.add_new_tile()
                     self.update_gui()
+
+                    self.move_count += 1  # Increment move counter
+
+                    # Take a screenshot after a certain number of moves
+                    if self.move_count == 70 and not self.screenshot_taken:
+                        self.take_screenshot(
+                            "game_mid_minimax.png", "Minimax Algorithm"
+                        )
+                        self.screenshot_taken = True
 
                     if not self.can_move():
                         self.game_over()
@@ -343,6 +662,9 @@ class Game2048:
         return False
 
     def game_over(self):
+        if self.run_without_gui:
+            return
+
         self.game_running = False
         try:
             game_over_label = tk.Label(
@@ -354,6 +676,9 @@ class Game2048:
             game_over_label.grid(
                 row=GRID_SIZE + 1, column=0, columnspan=GRID_SIZE
             )  # Place below the grid
+            self.take_screenshot(
+                "game_over_minimax.png", "Minimax Algorithm"
+            )  # Take screenshot on game over
         except tk.TclError as e:
             print(f"Error displaying game over: {e}")
 

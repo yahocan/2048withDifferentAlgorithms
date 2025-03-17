@@ -2,6 +2,8 @@ import tkinter as tk
 import random
 import copy
 from typing import Callable, List, Optional, Tuple
+import pyautogui
+from PIL import Image, ImageDraw, ImageFont
 
 GRID_SIZE = 4
 NEW_TILE_VALUES = [2, 4]
@@ -24,22 +26,51 @@ FONT = ("Verdana", 24, "bold")
 
 
 class Game2048:
-    def __init__(self):
-        self.window = tk.Tk()
-        self.window.title("2048")
-        self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
+    def __init__(self, run_without_gui=False):
+        self.run_without_gui = run_without_gui
         self.grid = [[0] * GRID_SIZE for _ in range(GRID_SIZE)]
         self.cells = []
         self.score = 0
         self.game_running = True
-        self.init_gui()
-        self.start_game()
-        self.ai_task = None
-        self.schedule_ai_move()
-        self.window.mainloop()
+        self.move_count = 0  # Add a counter for moves
+        self.screenshot_taken = False  # Flag to check if screenshot is taken
+
+        if not run_without_gui:
+            self.window = tk.Tk()
+            self.window.title("2048")
+            self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
+            self.init_gui()
+            self.start_game()
+            self.ai_task = None
+            self.schedule_ai_move()
+            self.window.mainloop()
+        else:
+            self.start_game()
+
+    def run(self):
+        """Run the game without GUI and return final score and max tile."""
+        if not self.run_without_gui:
+            return self.score, max(max(row) for row in self.grid)
+
+        # Run the game until game over
+        while self.can_move():
+            best_move = self.get_best_move()
+            if best_move:
+                best_move()
+                self.add_new_tile()
+                self.move_count += 1
+            else:
+                break
+
+        # Find the max tile value
+        max_tile = max(max(row) for row in self.grid)
+        return self.score, max_tile
 
     def init_gui(self):
         """Initialize the game's graphical user interface."""
+        if self.run_without_gui:
+            return
+
         try:
             self.frame = tk.Frame(self.window, bg=BACKGROUND_COLOR)
             self.frame.grid()
@@ -102,6 +133,9 @@ class Game2048:
 
     def update_gui(self):
         """Update the GUI to reflect the current game state."""
+        if self.run_without_gui:
+            return
+
         try:
             for i in range(GRID_SIZE):
                 for j in range(GRID_SIZE):
@@ -141,10 +175,90 @@ class Game2048:
         temp_grid = self.clone_grid()
         self.grid = temp_grid
         move_happened = move()  # Check if the move actually changes the grid
-        score_diff = self.score - original_score
+
+        if move_happened:
+            # Calculate basic score difference
+            score_diff = self.score - original_score
+
+            # Add new heuristics
+            empty_cells_score = self._count_empty_cells() * 10
+            clustering_score = self._calculate_clustering() / 100
+            max_tile_placement_score = self._evaluate_max_tile_placement() * 10
+
+            total_score = (
+                score_diff
+                + empty_cells_score
+                + clustering_score
+                + max_tile_placement_score
+            )
+        else:
+            total_score = -1  # Return -1 for invalid moves
+
         self.grid = original_grid
         self.score = original_score
-        return score_diff if move_happened else -1  # Return -1 for invalid moves
+        return total_score
+
+    def _count_empty_cells(self) -> int:
+        """Count the number of empty cells on the grid."""
+        return sum(row.count(0) for row in self.grid)
+
+    def _calculate_clustering(self) -> float:
+        """Calculate how well large tiles are clustered together."""
+        clustering_score = 0
+
+        # Find the mean position of tiles weighted by their values
+        total_value = 0
+        weighted_x_sum = 0
+        weighted_y_sum = 0
+
+        for i in range(GRID_SIZE):
+            for j in range(GRID_SIZE):
+                if self.grid[i][j] > 0:
+                    total_value += self.grid[i][j]
+                    weighted_x_sum += j * self.grid[i][j]
+                    weighted_y_sum += i * self.grid[i][j]
+
+        if total_value > 0:
+            mean_x = weighted_x_sum / total_value
+            mean_y = weighted_y_sum / total_value
+
+            # Calculate distance from each tile to the mean position
+            for i in range(GRID_SIZE):
+                for j in range(GRID_SIZE):
+                    if self.grid[i][j] > 0:
+                        # Higher values for larger tiles that are closer to the center of mass
+                        distance = ((i - mean_y) ** 2 + (j - mean_x) ** 2) ** 0.5
+                        clustering_score += self.grid[i][j] / (1 + distance)
+
+        return clustering_score
+
+    def _evaluate_max_tile_placement(self) -> int:
+        """Evaluate the position of the maximum tile on the grid."""
+        max_val = 0
+        max_i, max_j = 0, 0
+
+        # Find the maximum tile value and its position
+        for i in range(GRID_SIZE):
+            for j in range(GRID_SIZE):
+                if self.grid[i][j] > max_val:
+                    max_val = self.grid[i][j]
+                    max_i, max_j = i, j
+
+        # Check if the max tile is in a corner (best position)
+        corner_positions = [
+            (0, 0),
+            (0, GRID_SIZE - 1),
+            (GRID_SIZE - 1, 0),
+            (GRID_SIZE - 1, GRID_SIZE - 1),
+        ]
+        if (max_i, max_j) in corner_positions:
+            return max_val  # Maximum score for corner placement
+
+        # Check if it's on an edge
+        if max_i == 0 or max_i == GRID_SIZE - 1 or max_j == 0 or max_j == GRID_SIZE - 1:
+            return max_val // 2  # Half score for edge placement
+
+        return 0  # No bonus for center placement
 
     def get_best_move(self) -> Optional[Callable]:
         best_move = None
@@ -164,11 +278,35 @@ class Game2048:
 
     def schedule_ai_move(self):
         """Schedule the next AI move if the game is still running."""
+        if self.run_without_gui:
+            return
+
         if self.game_running:
             self.ai_task = self.window.after(50, self.ai_play)
 
+    def take_screenshot(self, filename: str, text: str):
+        """Take a screenshot of the game window and add text."""
+        if self.run_without_gui:
+            return
+
+        x, y, width, height = (
+            self.window.winfo_rootx(),
+            self.window.winfo_rooty(),
+            self.window.winfo_width(),
+            self.window.winfo_height(),
+        )
+        screenshot = pyautogui.screenshot(region=(x, y, width, height))
+        screenshot = screenshot.convert("RGB")
+        draw = ImageDraw.Draw(screenshot)
+        font = ImageFont.truetype("arial.ttf", 36)
+        draw.text((10, 50), text, fill="black", font=font)  # Adjusted position
+        screenshot.save(filename)
+
     def ai_play(self):
         """Execute AI move and schedule the next one if the game is still running."""
+        if self.run_without_gui:
+            return
+
         if self.game_running and self.can_move():
             try:
                 best_move = self.get_best_move()
@@ -176,6 +314,13 @@ class Game2048:
                     best_move()
                     self.add_new_tile()
                     self.update_gui()
+
+                    self.move_count += 1  # Increment move counter
+
+                    # Take a screenshot after a certain number of moves
+                    if self.move_count == 70 and not self.screenshot_taken:
+                        self.take_screenshot("game_mid_greedy.png", "Greedy Algorithm")
+                        self.screenshot_taken = True
 
                     if not self.can_move():
                         self.game_over()
@@ -272,6 +417,9 @@ class Game2048:
         return False
 
     def game_over(self):
+        if self.run_without_gui:
+            return
+
         self.game_running = False
         try:
             game_over_label = tk.Label(
@@ -283,6 +431,9 @@ class Game2048:
             game_over_label.grid(
                 row=GRID_SIZE + 1, column=0, columnspan=GRID_SIZE
             )  # Place below the grid
+            self.take_screenshot(
+                "game_over_greedy.png", "Greedy Algorithm"
+            )  # Take screenshot on game over
         except tk.TclError as e:
             print(f"Error displaying game over: {e}")
 
