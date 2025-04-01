@@ -1,0 +1,70 @@
+### **📌 Başlangıçtan Bu Ana Kadar Yapılan Tüm Değişiklikler**  
+Bu liste, **ilk yüklediğin oyun kodları ve rapor** üzerine yaptığın **tüm değişiklikleri** içerir.
+
+---
+
+## **1️⃣ Genel Güncellemeler**
+✅ **Tüm algoritmaların test sürecinde 100’er kez çalıştırılması sağlandı.**  
+✅ **Test sonuçları önceki, güncellenmiş ve son versiyon olarak kaydedildi ve analiz edildi.**  
+---
+
+## **2️⃣ Minimax Algoritması (`minimax2048.py`)**
+✅ **Derinlik 3’ten 2’ye düşürüldü.**  
+✅ **Alpha-Beta Budama (Alpha-Beta Pruning) geliştirilerek ve işlem süresi hızlandırıldı.**  
+✅ **Move Ordering (Öncelikli Hamle Sıralama) eklendi, en iyi hamleler önce incelenerek budama verimliliği artırıldı.**  
+✅ **LRU Cache Memorization eklendi, tekrar eden hesaplamalar önlendi.**  
+✅ **Her 100 hamlede bir cache temizleme mekanizması eklendi.**  
+✅ **İşlem süresi büyük ölçüde düşürüldü, ortalama skor ve maksimum taş artış gösterdi.**  
+
+---
+
+## **3️⃣ Expectimax Algoritması (`expectimax2048.py`)**
+✅ **Monte Carlo Rollout kullanıldı**  
+✅ **Rollout yapılacak boş hücreler artık köşeye yakınlığa göre ağırlıklandırılıyor.**  
+✅ **Merge potansiyeli değerlendirme fonksiyonuna dahil edildi.**  
+✅ Boş hücre sayısının 2 katı kadar rollout yaparak daha kapsamlı bir arama sağladık.
+✅ **Monte Carlo hesaplamaları daha optimize hale getirildi.**  
+✅ LRU Cache Memoization ekleyerek, tekrar eden durumları sakladık ve hesaplamaları hızlandırdık.
+✅ Periyodik Cache Temizleme mekanizması ekledik (bellek sızıntılarını önlemek için).
+
+---
+
+## **4️⃣ A* Algoritması (`astar2048.py`)**
+✅ **Maksimum taşın köşede olması heuristic’i iyileştirildi.**  
+✅ **Monotonluk (Monotonicity) ve Pürüzsüzlük (Smoothness) heuristic’leri optimize edildi.**
+✅ Heuristic fonksiyonunu geliştirdik:
+
+Monotonluk (Monotonicity) eklendi: Büyük taşlar belirli bir yönde sıralanıyor mu?
+Pürüzsüzlük (Smoothness) eklendi: Taşların arasında ani büyük farklar var mı?
+Büyük Taş Kümelenmesi (Tile Clustering) eklendi: Büyük taşlar birbirine yakın mı?
+Maksimum Taşın Konumu (Max Tile Placement) eklendi: En büyük taş köşede mi?
+✅ Move Ordering (Öncelikli Hamle Sıralama) ekledik.  
+
+---
+
+## **5️⃣ Greedy Algoritması (`greedy2048.py`)**
+✅ **Boş hücre sayısının önemi artırıldı.**  
+✅ **Taş kümelenmesi (Tile Clustering) ve maksimum taşın yerleşimi faktörleri iyileştirildi.**  
+✅ **Anlık maksimum kazanç yerine daha uzun vadeli kazanç sağlayan hamleler tercih edilmeye başlandı.**  
+✅ Maksimum Taşın Konumu (Max Tile Placement) eklendi.
+
+✅ **Sonuç olarak, ortalama skor hafif bir iyileşme gösterdi.**  
+
+---
+
+## **6️⃣ Hill Climbing Algoritması (`hillclimbing2048.py`)**
+✅ **Yerel maksimuma sıkışma sorunu azaltılmaya çalışıldı.**  
+✅ **Boş hücre sayısının ağırlığı 100’den 200’e çıkarıldı.**  
+ Sadece boş hücre sayısına bakmak yerine daha gelişmiş heuristic fonksiyonları ekledik:
+
+Monotonluk (Monotonicity)
+Pürüzsüzlük (Smoothness)
+Maksimum Taşın Konumu (Max Tile Placement)
+✅ **Merge potansiyeli hesaplaması eklendi.**  
+✅ **%15 olasılıkla rastgele yeniden başlatma (random restart) mekanizması eklendi.**  
+✅ **En iyi 2 hamleden rastgele birini seçme mekanizması getirildi.**  
+
+---
+
+
+

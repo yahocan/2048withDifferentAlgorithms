@@ -395,7 +395,7 @@ class Game2048:
                 text = "BAŞLANGIÇ"  # Changed from "Expectimax Algorithm" to "BAŞLANGIÇ"
             elif reason == "mid":
                 filename = "game_mid_expectimax.png"
-                text = "Expectimax Algorithm"
+                text = ""
             elif reason == "gameover":
                 filename = "game_over_expectimax.png"
                 text = "Expectimax Algorithm"
@@ -437,7 +437,7 @@ class Game2048:
                 self.move_count += 1
 
                 # Take screenshot only at move 100
-                if self.move_count == 200:
+                if self.move_count == 250:
                     self.take_screenshot("mid")
 
                 if self.game_over():

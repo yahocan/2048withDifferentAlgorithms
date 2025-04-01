@@ -1,4 +1,4 @@
-Algorithm,Avg Score,Max Score,Avg Max Tile,Avg Time
+sAlgorithm,Avg Score,Max Score,Avg Max Tile,Avg Time
 A*,2614.8,7152,224.64,0.018736445903778078
 Expectimax,10492.52,26692,783.36,1.5495990562438964
 Greedy,2689.0,6944,234.24,0.021468443870544432
