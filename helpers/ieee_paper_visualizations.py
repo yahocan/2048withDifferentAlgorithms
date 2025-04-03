@@ -44,7 +44,7 @@ plt.rcParams["legend.fontsize"] = 10
 plt.rcParams["figure.titlesize"] = 12
 
 # Define paths
-OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ieee_figures")
+OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../ieee_figures")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Load data
