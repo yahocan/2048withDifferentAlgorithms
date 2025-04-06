@@ -1,3 +1,6 @@
+# Açgözlü (Greedy) algoritması ile 2048 oyunu çözümü
+# Her adımda en yüksek skoru veren hamleyi seçer
+
 import tkinter as tk
 import random
 import copy
@@ -32,8 +35,10 @@ class Game2048:
         self.cells = []
         self.score = 0
         self.game_running = True
-        self.move_count = 0  # Add a counter for moves
-        self.screenshot_taken = False  # Flag to check if screenshot is taken
+        self.move_count = 0  # Hamle sayısını tutan sayaç (Move counter)
+        self.screenshot_taken = (
+            False  # Ekran görüntüsü alınıp alınmadığını kontrol eden bayrak
+        )
 
         if not run_without_gui:
             self.window = tk.Tk()
@@ -48,11 +53,11 @@ class Game2048:
             self.start_game()
 
     def run(self):
-        """Run the game without GUI and return final score and max tile."""
+        """GUI olmadan oyunu çalıştır ve final skoru ile max değeri döndür."""
         if not self.run_without_gui:
             return self.score, max(max(row) for row in self.grid)
 
-        # Run the game until game over
+        # Oyun bitene kadar çalıştır (Run until game over)
         while self.can_move():
             best_move = self.get_best_move()
             if best_move:
@@ -62,12 +67,12 @@ class Game2048:
             else:
                 break
 
-        # Find the max tile value
+        # En büyük değeri bul (Find the max tile value)
         max_tile = max(max(row) for row in self.grid)
         return self.score, max_tile
 
     def init_gui(self):
-        """Initialize the game's graphical user interface."""
+        """Oyunun grafik arayüzünü başlat."""
         if self.run_without_gui:
             return
 
@@ -75,7 +80,7 @@ class Game2048:
             self.frame = tk.Frame(self.window, bg=BACKGROUND_COLOR)
             self.frame.grid()
 
-            # Move score label to row 0 (top) and make it visible
+            # Skor etiketini en üste (satır 0) taşı ve görünür yap
             self.score_label = tk.Label(
                 self.frame,
                 text=f"Score: {self.score}",
@@ -86,7 +91,7 @@ class Game2048:
             )
             self.score_label.grid(row=0, column=0, columnspan=GRID_SIZE, sticky="nsew")
 
-            # Move the game grid to start at row 1
+            # Oyun grid'ini 1. satırdan başlat
             for i in range(GRID_SIZE):
                 row_cells = []
                 for j in range(GRID_SIZE):
@@ -95,7 +100,7 @@ class Game2048:
                     )
                     cell_frame.grid(
                         row=i + 1, column=j, padx=5, pady=5
-                    )  # Note the i+1 here
+                    )  # i+1 burada önemli
                     cell = tk.Label(
                         self.frame,
                         text="",
@@ -104,21 +109,22 @@ class Game2048:
                         font=FONT,
                         bg=TILE_COLORS[0],
                     )
-                    cell.grid(row=i + 1, column=j)  # Note the i+1 here
+                    cell.grid(row=i + 1, column=j)  # i+1 burada önemli
                     row_cells.append(cell)
                 self.cells.append(row_cells)
         except tk.TclError as e:
-            print(f"Error initializing GUI: {e}")
+            print(f"GUI başlatılırken hata oluştu: {e}")
             self.game_running = False
 
     def start_game(self):
-        """Initialize the game state."""
+        """Oyunu başlat - 2 tane başlangıç taşı ekle."""
         self.add_new_tile()
         self.add_new_tile()
         self.update_gui()
 
     def add_new_tile(self) -> bool:
-        """Add a new tile to the grid. Returns True if successful, False if no empty cells."""
+        """Rastgele bir boş hücreye yeni bir taş ekle (2 veya 4).
+        Başarılıysa True, boş hücre yoksa False döndürür."""
         empty_cells = [
             (i, j)
             for i in range(GRID_SIZE)
@@ -132,7 +138,7 @@ class Game2048:
         return False
 
     def update_gui(self):
-        """Update the GUI to reflect the current game state."""
+        """Arayüzü güncelle - grid değerlerini ve skoru göster."""
         if self.run_without_gui:
             return
 
@@ -149,11 +155,11 @@ class Game2048:
             self.game_running = False
 
     def clone_grid(self) -> List[List[int]]:
-        """Create a deep copy of the current grid."""
+        """Grid'in derin bir kopyasını oluştur."""
         return copy.deepcopy(self.grid)
 
     def get_possible_moves(self, test_grid: List[List[int]]) -> List[Callable]:
-        """Get all possible moves for a given grid state."""
+        """Belirli bir grid durumu için tüm olası hareketleri al."""
         moves = []
         original_grid = self.grid
         original_score = self.score
@@ -170,20 +176,25 @@ class Game2048:
         return moves
 
     def evaluate_move(self, move: Callable) -> int:
+        """Bir hamleyi değerlendir - skor artışı ve heuristiklerle."""
         original_grid = self.clone_grid()
         original_score = self.score
         temp_grid = self.clone_grid()
         self.grid = temp_grid
-        move_happened = move()  # Check if the move actually changes the grid
+        move_happened = (
+            move()
+        )  # Hareketin gerçekten grid'i değiştirip değiştirmediğini kontrol et
 
         if move_happened:
-            # Calculate basic score difference
+            # Temel skor farkını hesapla
             score_diff = self.score - original_score
 
-            # Add new heuristics
-            empty_cells_score = self._count_empty_cells() * 10
-            clustering_score = self._calculate_clustering() / 100
-            max_tile_placement_score = self._evaluate_max_tile_placement() * 10
+            # Yeni heuristikler ekle
+            empty_cells_score = self._count_empty_cells() * 10  # Boş hücrelere bonus
+            clustering_score = self._calculate_clustering() / 100  # Kümelenme skoru
+            max_tile_placement_score = (
+                self._evaluate_max_tile_placement() * 10
+            )  # Max taş konumu
 
             total_score = (
                 score_diff
@@ -192,21 +203,21 @@ class Game2048:
                 + max_tile_placement_score
             )
         else:
-            total_score = -1  # Return -1 for invalid moves
+            total_score = -1  # Geçersiz hamleler için -1 döndür
 
         self.grid = original_grid
         self.score = original_score
         return total_score
 
     def _count_empty_cells(self) -> int:
-        """Count the number of empty cells on the grid."""
+        """Grid üzerindeki boş hücre sayısını hesapla."""
         return sum(row.count(0) for row in self.grid)
 
     def _calculate_clustering(self) -> float:
-        """Calculate how well large tiles are clustered together."""
+        """Büyük taşların ne kadar iyi kümelendiğini hesapla."""
         clustering_score = 0
 
-        # Find the mean position of tiles weighted by their values
+        # Taşların ağırlıklı ortalama konumunu bul
         total_value = 0
         weighted_x_sum = 0
         weighted_y_sum = 0
@@ -222,29 +233,29 @@ class Game2048:
             mean_x = weighted_x_sum / total_value
             mean_y = weighted_y_sum / total_value
 
-            # Calculate distance from each tile to the mean position
+            # Her taşın kütle merkezine uzaklığını hesapla
             for i in range(GRID_SIZE):
                 for j in range(GRID_SIZE):
                     if self.grid[i][j] > 0:
-                        # Higher values for larger tiles that are closer to the center of mass
+                        # Kütle merkezine yakın büyük taşlar için daha yüksek değerler
                         distance = ((i - mean_y) ** 2 + (j - mean_x) ** 2) ** 0.5
                         clustering_score += self.grid[i][j] / (1 + distance)
 
         return clustering_score
 
     def _evaluate_max_tile_placement(self) -> int:
-        """Evaluate the position of the maximum tile on the grid."""
+        """Grid üzerindeki en büyük taşın konumunu değerlendir."""
         max_val = 0
         max_i, max_j = 0, 0
 
-        # Find the maximum tile value and its position
+        # En büyük değeri ve konumunu bul
         for i in range(GRID_SIZE):
             for j in range(GRID_SIZE):
                 if self.grid[i][j] > max_val:
                     max_val = self.grid[i][j]
                     max_i, max_j = i, j
 
-        # Check if the max tile is in a corner (best position)
+        # En büyük taşın köşede olup olmadığını kontrol et (en iyi pozisyon)
         corner_positions = [
             (0, 0),
             (0, GRID_SIZE - 1),
@@ -252,20 +263,21 @@ class Game2048:
             (GRID_SIZE - 1, GRID_SIZE - 1),
         ]
         if (max_i, max_j) in corner_positions:
-            return max_val  # Maximum score for corner placement
+            return max_val  # Köşe yerleşimi için maksimum puan
 
-        # Check if it's on an edge
+        # Kenarda olup olmadığını kontrol et
         if max_i == 0 or max_i == GRID_SIZE - 1 or max_j == 0 or max_j == GRID_SIZE - 1:
-            return max_val // 2  # Half score for edge placement
+            return max_val // 2  # Kenar yerleşimi için yarım puan
 
-        return 0  # No bonus for center placement
+        return 0  # Merkez yerleşimi için bonus yok
 
     def get_best_move(self) -> Optional[Callable]:
+        """Greedy algoritması ile en iyi hamleyi bul - her adımda en yüksek skoru veren hamle."""
         best_move = None
         max_score = -1
         current_grid = self.clone_grid()
 
-        # Only consider moves that are possible (change the grid)
+        # Sadece gridi değiştiren hamleleri değerlendir
         possible_moves = self.get_possible_moves(current_grid)
 
         for move in possible_moves:
@@ -277,7 +289,7 @@ class Game2048:
         return best_move
 
     def schedule_ai_move(self):
-        """Schedule the next AI move if the game is still running."""
+        """Oyun devam ediyorsa bir sonraki AI hamlesini zamanla."""
         if self.run_without_gui:
             return
 
@@ -285,7 +297,7 @@ class Game2048:
             self.ai_task = self.window.after(50, self.ai_play)
 
     def take_screenshot(self, filename: str, text: str):
-        """Take a screenshot of the game window and add text."""
+        """Oyun penceresinin ekran görüntüsünü al ve metin ekle."""
         if self.run_without_gui:
             return
 
@@ -299,11 +311,11 @@ class Game2048:
         screenshot = screenshot.convert("RGB")
         draw = ImageDraw.Draw(screenshot)
         font = ImageFont.truetype("arial.ttf", 36)
-        draw.text((10, 50), text, fill="black", font=font)  # Adjusted position
+        draw.text((10, 50), text, fill="black", font=font)  # Pozisyon ayarlandı
         screenshot.save(filename)
 
     def ai_play(self):
-        """Execute AI move and schedule the next one if the game is still running."""
+        """AI hamlesini yap ve oyun devam ediyorsa sonraki hamleyi zamanla."""
         if self.run_without_gui:
             return
 
@@ -315,9 +327,9 @@ class Game2048:
                     self.add_new_tile()
                     self.update_gui()
 
-                    self.move_count += 1  # Increment move counter
+                    self.move_count += 1  # Hamle sayacını artır
 
-                    # Take a screenshot after a certain number of moves
+                    # Belirli bir hamle sayısından sonra ekran görüntüsü al
                     if self.move_count == 70 and not self.screenshot_taken:
                         self.take_screenshot("game_mid_greedy.png", "Greedy Algorithm")
                         self.screenshot_taken = True
@@ -327,37 +339,37 @@ class Game2048:
                     else:
                         self.schedule_ai_move()
             except Exception as e:
-                print(f"Error in AI play: {e}")
+                print(f"AI play'de hata oluştu: {e}")
                 self.game_over()
         elif not self.can_move():
             self.game_over()
 
     def move_left(self) -> bool:
-        """Move tiles left and merge if possible."""
+        """Taşları sola kaydır ve mümkünse birleştir."""
         return self.move(lambda row: self.compress(row), lambda row: self.merge(row))
 
     def move_right(self) -> bool:
-        """Move tiles right and merge if possible."""
+        """Taşları sağa kaydır ve mümkünse birleştir."""
         return self.move(
             lambda row: self.compress(row[::-1])[::-1],
             lambda row: self.merge(row[::-1])[::-1],
         )
 
     def move_up(self) -> bool:
-        """Move tiles up and merge if possible."""
+        """Taşları yukarı kaydır ve mümkünse birleştir."""
         return self.move_columns(
             lambda col: self.compress(col), lambda col: self.merge(col)
         )
 
     def move_down(self) -> bool:
-        """Move tiles down and merge if possible."""
+        """Taşları aşağı kaydır ve mümkünse birleştir."""
         return self.move_columns(
             lambda col: self.compress(col[::-1])[::-1],
             lambda col: self.merge(col[::-1])[::-1],
         )
 
     def move(self, compress_fn: Callable, merge_fn: Callable) -> bool:
-        """Generic move function for horizontal moves."""
+        """Yatay hareketler için genel hareket fonksiyonu."""
         moved = False
         for i in range(GRID_SIZE):
             original = self.grid[i][:]
@@ -370,7 +382,7 @@ class Game2048:
         return moved
 
     def move_columns(self, compress_fn: Callable, merge_fn: Callable) -> bool:
-        """Generic move function for vertical moves."""
+        """Dikey hareketler için genel hareket fonksiyonu."""
         moved = False
         for j in range(GRID_SIZE):
             original = [self.grid[i][j] for i in range(GRID_SIZE)]
@@ -384,31 +396,31 @@ class Game2048:
         return moved
 
     def compress(self, row: List[int]) -> List[int]:
-        """Remove zeros and shift numbers to one side."""
+        """Sıfırları çıkar ve sayıları bir tarafa kaydır."""
         return [num for num in row if num != 0] + [0] * row.count(0)
 
     def merge(self, row: List[int]) -> List[int]:
-        """Merge adjacent equal numbers."""
+        """Yan yana eşit sayıları birleştir."""
         for i in range(len(row) - 1):
             if row[i] != 0 and row[i] == row[i + 1]:
                 row[i] *= 2
                 row[i + 1] = 0
-                self.score += row[i]  # Update score
+                self.score += row[i]  # Skoru güncelle
         return row
 
     def can_move(self) -> bool:
-        """Check if any moves are possible."""
-        # Check for empty cells
+        """Herhangi bir hareketin mümkün olup olmadığını kontrol et."""
+        # Boş hücre kontrolü
         if any(0 in row for row in self.grid):
             return True
 
-        # Check for possible merges horizontally
+        # Yatay birleştirme imkanı kontrolü
         for i in range(GRID_SIZE):
             for j in range(GRID_SIZE - 1):
                 if self.grid[i][j] == self.grid[i][j + 1]:
                     return True
 
-        # Check for possible merges vertically
+        # Dikey birleştirme imkanı kontrolü
         for i in range(GRID_SIZE - 1):
             for j in range(GRID_SIZE):
                 if self.grid[i][j] == self.grid[i + 1][j]:
@@ -417,6 +429,7 @@ class Game2048:
         return False
 
     def game_over(self):
+        """Oyun bittiğinde çalışacak fonksiyon."""
         if self.run_without_gui:
             return
 
@@ -430,15 +443,15 @@ class Game2048:
             )
             game_over_label.grid(
                 row=GRID_SIZE + 1, column=0, columnspan=GRID_SIZE
-            )  # Place below the grid
+            )  # Gridin altına yerleştir
             self.take_screenshot(
                 "game_over_greedy.png", "Greedy Algorithm"
-            )  # Take screenshot on game over
+            )  # Oyun sonu ekran görüntüsü
         except tk.TclError as e:
-            print(f"Error displaying game over: {e}")
+            print(f"Game over gösterilirken hata oluştu: {e}")
 
     def on_closing(self):
-        """Handle window closing event."""
+        """Pencere kapatma olayını işle."""
         self.game_running = False
         if self.ai_task:
             self.window.after_cancel(self.ai_task)

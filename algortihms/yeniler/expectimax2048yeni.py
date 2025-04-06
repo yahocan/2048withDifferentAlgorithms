@@ -1,16 +1,19 @@
+# Expectimax algoritması ile 2048 oyunu çözümü
+# Şans faktörünü göz önüne alan bir arama algoritması
+
 import tkinter as tk
 import random
 import copy
 import os
 import datetime
-import time  # Add this import for time-related functions
+import time  # Zaman fonksiyonları için gerekli import
 from typing import Callable, List, Optional, Tuple
-import pyautogui  # Change from ImageGrab to pyautogui
+import pyautogui  # ImageGrab yerine pyautogui kullanılıyor
 from PIL import (
     Image,
     ImageDraw,
     ImageFont,
-)  # Add ImageDraw and ImageFont for text on screenshots
+)  # Ekran görüntülerine metin eklemek için gerekli
 from functools import lru_cache
 
 GRID_SIZE = 4
@@ -40,9 +43,9 @@ class Game2048:
         self.cells = []
         self.score = 0
         self.game_running = True
-        self.move_count = 0  # Track number of moves for screenshot naming
+        self.move_count = 0  # Ekran görüntüleri için hamle sayısını takip et
 
-        # Create screenshots directory if it doesn't exist
+        # Ekran görüntüleri için klasör oluştur (Create directory for screenshots)
         self.screenshots_dir = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "screenshots"
         )
@@ -61,11 +64,11 @@ class Game2048:
             self.start_game()
 
     def run(self):
-        """Run the game without GUI and return final score and max tile."""
+        """GUI olmadan oyunu çalıştır ve final skoru ile max değeri döndür."""
         if not self.run_without_gui:
             return self.score, max(max(row) for row in self.grid)
 
-        # Run the game until game over
+        # Oyun bitene kadar çalıştır (Run until game over)
         while self.can_move(self.grid):
             best_move = self.get_best_move()
             if best_move:
@@ -75,12 +78,12 @@ class Game2048:
             else:
                 break
 
-        # Find the max tile value
+        # En büyük değeri bul (Find the max tile value)
         max_tile = max(max(row) for row in self.grid)
         return self.score, max_tile
 
     def init_gui(self):
-        """Initialize the game's graphical user interface."""
+        """Oyunun grafik arayüzünü başlat."""
         if self.run_without_gui:
             return
         try:
@@ -116,20 +119,22 @@ class Game2048:
                     row_cells.append(cell)
                 self.cells.append(row_cells)
         except tk.TclError as e:
-            print(f"Error initializing GUI: {e}")
+            print(f"GUI başlatılırken hata oluştu: {e}")
             self.game_running = False
 
     def evaluate(self) -> float:
-        """Evaluate the current board position using multiple heuristics."""
-        empty_count = sum(row.count(0) for row in self.grid) * 10000
-        mono_score = self._calculate_monotonicity()
-        smooth_score = self._calculate_smoothness()
-        corner_score = self._calculate_corner_score()
+        """Mevcut tahta durumunu birden çok heuristic kullanarak değerlendir."""
+        empty_count = sum(row.count(0) for row in self.grid) * 10000  # Boş hücre bonusu
+        mono_score = self._calculate_monotonicity()  # Monotonluk skoru
+        smooth_score = self._calculate_smoothness()  # Pürüzsüzlük skoru
+        corner_score = self._calculate_corner_score()  # Köşe skoru
 
-        # New heuristics
-        clustering_score = self._calculate_tile_clustering() * 50
-        empty_tile_ratio = self._calculate_empty_tile_ratio() * 2000
-        merge_potential = self._calculate_merge_potential() * 1000
+        # Yeni heuristikler
+        clustering_score = self._calculate_tile_clustering() * 50  # Kümelenme skoru
+        empty_tile_ratio = self._calculate_empty_tile_ratio() * 2000  # Boş hücre oranı
+        merge_potential = (
+            self._calculate_merge_potential() * 1000
+        )  # Birleşme potansiyeli
 
         return (
             empty_count
@@ -142,7 +147,7 @@ class Game2048:
         )
 
     def _calculate_monotonicity(self) -> float:
-        """Calculate how monotonic (ordered) the grid is."""
+        """Grid'in ne kadar monoton (sıralı) olduğunu hesapla."""
         mono_score = 0
         for i in range(GRID_SIZE):
             for j in range(GRID_SIZE - 1):
@@ -157,7 +162,7 @@ class Game2048:
         return mono_score
 
     def _calculate_smoothness(self) -> float:
-        """Calculate the smoothness of the grid (difference between adjacent tiles)."""
+        """Grid'in pürüzsüzlüğünü hesapla (komşu hücreler arası fark)."""
         smoothness = 0
         for i in range(GRID_SIZE):
             for j in range(GRID_SIZE):
@@ -169,20 +174,20 @@ class Game2048:
         return smoothness
 
     def _calculate_corner_score(self) -> float:
-        """Calculate score based on high values in corners."""
+        """Köşelerdeki yüksek değerlere göre skor hesapla."""
         corners = [
             self.grid[0][0],
             self.grid[0][GRID_SIZE - 1],
             self.grid[GRID_SIZE - 1][0],
             self.grid[GRID_SIZE - 1][GRID_SIZE - 1],
         ]
-        return max(corners) * 2.0
+        return max(corners) * 2.0  # Köşedeki en yüksek değere bonus
 
     def _calculate_tile_clustering(self) -> float:
-        """Calculate how well large tiles are clustered together."""
+        """Büyük taşların ne kadar iyi kümelendiğini hesapla."""
         clustering_score = 0
 
-        # Find the mean position of tiles weighted by their values
+        # Taşların değerleriyle ağırlıklandırılmış ortalama pozisyonu
         total_value = 0
         weighted_x_sum = 0
         weighted_y_sum = 0
@@ -198,48 +203,48 @@ class Game2048:
             mean_x = weighted_x_sum / total_value
             mean_y = weighted_y_sum / total_value
 
-            # Calculate distance from each tile to the mean position
+            # Her taşın ortalama pozisyona uzaklığını hesapla
             for i in range(GRID_SIZE):
                 for j in range(GRID_SIZE):
                     if self.grid[i][j] > 0:
-                        # Higher values for larger tiles that are closer to the center of mass
+                        # Kütle merkezine yakın büyük taşlar için yüksek puan
                         distance = ((i - mean_y) ** 2 + (j - mean_x) ** 2) ** 0.5
                         clustering_score += self.grid[i][j] / (1 + distance)
 
         return clustering_score
 
     def _calculate_empty_tile_ratio(self) -> float:
-        """Calculate the ratio of empty tiles to non-empty tiles."""
+        """Boş hücre oranını hesapla (boş hücre/dolu hücre)."""
         empty_count = sum(row.count(0) for row in self.grid)
         non_empty_count = GRID_SIZE * GRID_SIZE - empty_count
 
-        if non_empty_count == 0:  # Avoid division by zero
+        if non_empty_count == 0:  # Sıfıra bölünmeyi önle (Prevent division by zero)
             return GRID_SIZE * GRID_SIZE
 
-        return empty_count / (non_empty_count + 1)  # +1 to avoid division by zero
+        return empty_count / (non_empty_count + 1)  # +1 sıfıra bölünmeyi önlemek için
 
     def _calculate_merge_potential(self) -> float:
-        """Calculate the potential for merging tiles on the board."""
+        """Tahtadaki birleştirme potansiyelini hesapla."""
         merge_score = 0
 
-        # Check horizontal merge potential
+        # Yatay birleştirme potansiyelini kontrol et
         for i in range(GRID_SIZE):
             for j in range(GRID_SIZE - 1):
                 if self.grid[i][j] != 0 and self.grid[i][j] == self.grid[i][j + 1]:
-                    merge_score += self.grid[i][j] * 2  # Value after merge
+                    merge_score += self.grid[i][j] * 2  # Birleşim sonrası değer
 
-        # Check vertical merge potential
+        # Dikey birleştirme potansiyelini kontrol et
         for i in range(GRID_SIZE - 1):
             for j in range(GRID_SIZE):
                 if self.grid[i][j] != 0 and self.grid[i][j] == self.grid[i + 1][j]:
-                    merge_score += self.grid[i][j] * 2  # Value after merge
+                    merge_score += self.grid[i][j] * 2  # Birleşim sonrası değer
 
         return merge_score
 
     def expectimax(
         self, depth: int, agent_type: str, test_grid: List[List[int]]
     ) -> float:
-        """Implement expectimax algorithm with three types of nodes."""
+        """Expectimax algoritması uygula - şans faktörünü hesaba katan üç tip düğüm."""
         if depth == 0:
             return self.evaluate()
 
@@ -248,6 +253,7 @@ class Game2048:
         self.grid = test_grid
 
         if agent_type == "max":
+            # Maksimum ajan - en iyi hamleyi seç
             possible_moves = self.get_possible_moves(test_grid)
             if not possible_moves:
                 self.grid = original_grid
@@ -267,6 +273,7 @@ class Game2048:
             return max_value
 
         elif agent_type == "chance":
+            # Şans ajanı - tüm olası yeni taşların ortalamasını al
             empty_cells = [
                 (i, j)
                 for i in range(GRID_SIZE)
@@ -281,13 +288,14 @@ class Game2048:
 
             avg_value = 0
             num_possibilities = len(empty_cells) * len(NEW_TILE_VALUES)
-            probabilities = {2: 0.9, 4: 0.1}
+            probabilities = {2: 0.9, 4: 0.1}  # 2 ve 4 taşları için olasılıklar
 
             for i, j in empty_cells:
                 for new_value in NEW_TILE_VALUES:
                     temp_grid = copy.deepcopy(test_grid)
                     temp_grid[i][j] = new_value
                     value = self.expectimax(depth - 1, "max", temp_grid)
+                    # Her boş hücre için ağırlıklı ortalama hesapla
                     avg_value += value * probabilities[new_value] / len(empty_cells)
 
             self.grid = original_grid
@@ -295,7 +303,7 @@ class Game2048:
             return avg_value
 
     def get_best_move(self, depth: int = 3) -> Optional[Callable]:
-        """Find the best move using expectimax algorithm."""
+        """Expectimax algoritmasını kullanarak en iyi hamleyi bul."""
         try:
             best_move = None
             max_value = float("-inf")
@@ -317,21 +325,21 @@ class Game2048:
             self.score = original_score
             return best_move
         except Exception as e:
-            print(f"Error in get_best_move: {e}")
+            print(f"get_best_move'da hata oluştu: {e}")
             return None
 
     def start_game(self):
-        """Start the game by adding two initial tiles."""
+        """İki başlangıç taşı ekleyerek oyunu başlat."""
         self.add_new_tile()
         self.add_new_tile()
         self.update_gui()
 
-        # Take screenshot at the beginning of the game
+        # Oyun başlangıcında ekran görüntüsü al
         if not self.run_without_gui:
             self.window.after(500, lambda: self.take_screenshot("start"))
 
     def add_new_tile(self):
-        """Add a new tile (2 or 4) to a random empty cell."""
+        """Rastgele bir boş hücreye yeni bir taş ekle (2 veya 4)."""
         empty_cells = [
             (i, j)
             for i in range(GRID_SIZE)
@@ -340,10 +348,11 @@ class Game2048:
         ]
         if empty_cells:
             i, j = random.choice(empty_cells)
+            # %90 olasılıkla 2, %10 olasılıkla 4 gelir
             self.grid[i][j] = random.choices(NEW_TILE_VALUES, weights=[0.9, 0.1])[0]
 
     def update_gui(self):
-        """Update the GUI to reflect the current state of the grid."""
+        """Grid'in mevcut durumunu yansıtmak için GUI'yi güncelle."""
         if self.run_without_gui:
             return
         for i in range(GRID_SIZE):
@@ -356,11 +365,11 @@ class Game2048:
         self.window.update_idletasks()
 
     def clone_grid(self) -> List[List[int]]:
-        """Return a deep copy of the current grid."""
+        """Grid'in derin bir kopyasını döndür."""
         return copy.deepcopy(self.grid)
 
     def get_possible_moves(self, grid: List[List[int]]) -> List[Callable]:
-        """Return a list of possible move functions."""
+        """Mümkün olan hamlelerin listesini döndür."""
         moves = []
         if self.can_move_left(grid):
             moves.append(self.move_left)
@@ -373,15 +382,15 @@ class Game2048:
         return moves
 
     def take_screenshot(self, reason="move"):
-        """Take a screenshot of the current game state."""
+        """Oyunun mevcut durumunun ekran görüntüsünü al ve metin ekle."""
         if self.run_without_gui:
             return
         try:
-            # Ensure window is updated before taking screenshot
+            # Ekran görüntüsü almadan önce pencerenin güncellendiğinden emin ol
             self.window.update_idletasks()
             self.window.update()
 
-            # Get window position and size
+            # Pencere konumu ve boyutu
             x, y, width, height = (
                 self.window.winfo_rootx(),
                 self.window.winfo_rooty(),
@@ -389,10 +398,10 @@ class Game2048:
                 self.window.winfo_height(),
             )
 
-            # Set filename based on reason
+            # Sebebe göre dosya adı belirle
             if reason == "start":
                 filename = "game_start_expectimax.png"
-                text = "BAŞLANGIÇ"  # Changed from "Expectimax Algorithm" to "BAŞLANGIÇ"
+                text = "BAŞLANGIÇ"  # "Expectimax Algorithm" yerine "BAŞLANGIÇ"
             elif reason == "mid":
                 filename = "game_mid_expectimax.png"
                 text = ""
@@ -400,32 +409,32 @@ class Game2048:
                 filename = "game_over_expectimax.png"
                 text = "Expectimax Algorithm"
             else:
-                return  # Don't take screenshots for other reasons
+                return  # Diğer sebepler için ekran görüntüsü alma
 
             filepath = os.path.join(self.screenshots_dir, filename)
 
-            # Capture screenshot using pyautogui like in the greedy version
+            # pyautogui ile ekran görüntüsü al
             screenshot = pyautogui.screenshot(region=(x, y, width, height))
             screenshot = screenshot.convert("RGB")
 
-            # Add algorithm name to the screenshot
+            # Ekran görüntüsüne algoritma adını ekle
             draw = ImageDraw.Draw(screenshot)
             try:
                 font = ImageFont.truetype("arial.ttf", 36)
             except IOError:
-                # Fallback to default font if arial.ttf is not available
+                # arial.ttf bulunamazsa varsayılan fontu kullan
                 font = ImageFont.load_default()
 
             draw.text((10, 50), text, fill="black", font=font)
 
-            # Save the screenshot
+            # Ekran görüntüsünü kaydet
             screenshot.save(filepath)
-            print(f"Screenshot saved: {filepath}")
+            print(f"Ekran görüntüsü kaydedildi: {filepath}")
         except Exception as e:
-            print(f"Error taking screenshot: {e}")
+            print(f"Ekran görüntüsü alınırken hata oluştu: {e}")
 
     def schedule_ai_move(self):
-        """Schedule the AI to make a move."""
+        """AI'nin bir hamle yapmasını zamanla."""
         if self.run_without_gui:
             return
         if self.game_running:
@@ -436,18 +445,20 @@ class Game2048:
                 self.update_gui()
                 self.move_count += 1
 
-                # Take screenshot only at move 100
+                # Sadece belirli bir hamle sayısında ekran görüntüsü al
                 if self.move_count == 250:
                     self.take_screenshot("mid")
 
                 if self.game_over():
                     self.game_running = False
-                    self.take_screenshot("gameover")  # Take screenshot at game over
+                    self.take_screenshot(
+                        "gameover"
+                    )  # Oyun bittiğinde ekran görüntüsü al
                     print("Game Over!")
             self.window.after(50, self.schedule_ai_move)
 
     def ai_play(self):
-        """Make the AI play a move."""
+        """AI'nın bir hamle yapmasını sağla."""
         best_move = self.get_best_move()
         if best_move:
             best_move()
@@ -455,11 +466,11 @@ class Game2048:
             self.update_gui()
 
     def move_left(self):
-        """Move tiles left."""
+        """Taşları sola kaydır."""
         self.move(self.grid, self.compress, self.merge, self.compress)
 
     def move_right(self):
-        """Move tiles right."""
+        """Taşları sağa kaydır."""
         self.move(
             self.grid,
             self.reverse,
@@ -470,7 +481,7 @@ class Game2048:
         )
 
     def move_up(self):
-        """Move tiles up."""
+        """Taşları yukarı kaydır."""
         self.move(
             self.grid,
             self.transpose,
@@ -481,7 +492,7 @@ class Game2048:
         )
 
     def move_down(self):
-        """Move tiles down."""
+        """Taşları aşağı kaydır."""
         self.move(
             self.grid,
             self.transpose,
@@ -494,19 +505,19 @@ class Game2048:
         )
 
     def move(self, grid, *steps):
-        """Apply a sequence of steps to the grid."""
+        """Grid üzerinde bir dizi adım uygula."""
         for step in steps:
             step(grid)
 
     def compress(self, grid):
-        """Compress the grid by sliding tiles to the left."""
+        """Taşları sola kaydırıp sıfırları sağa topla."""
         for i in range(GRID_SIZE):
             new_row = [tile for tile in grid[i] if tile != 0]
             new_row += [0] * (GRID_SIZE - len(new_row))
             grid[i] = new_row
 
     def merge(self, grid):
-        """Merge tiles in the grid."""
+        """Grid'deki taşları birleştir."""
         for i in range(GRID_SIZE):
             for j in range(GRID_SIZE - 1):
                 if grid[i][j] == grid[i][j + 1] and grid[i][j] != 0:
@@ -515,16 +526,16 @@ class Game2048:
                     self.score += grid[i][j]
 
     def reverse(self, grid):
-        """Reverse the rows of the grid."""
+        """Grid'in satırlarını tersine çevir."""
         for i in range(GRID_SIZE):
             grid[i] = grid[i][::-1]
 
     def transpose(self, grid):
-        """Transpose the grid (swap rows and columns)."""
+        """Grid'i transpoze et (satır ve sütunları değiştir)."""
         grid[:] = [list(row) for row in zip(*grid)]
 
     def can_move(self, grid) -> bool:
-        """Check if any moves are possible."""
+        """Herhangi bir hareketin mümkün olup olmadığını kontrol et."""
         for i in range(GRID_SIZE):
             for j in range(GRID_SIZE):
                 if grid[i][j] == 0:
@@ -536,7 +547,7 @@ class Game2048:
         return False
 
     def can_move_left(self, grid) -> bool:
-        """Check if a move left is possible."""
+        """Sola hareket mümkün mü kontrol et."""
         for i in range(GRID_SIZE):
             for j in range(1, GRID_SIZE):
                 if grid[i][j] != 0 and (
@@ -546,7 +557,7 @@ class Game2048:
         return False
 
     def can_move_right(self, grid) -> bool:
-        """Check if a move right is possible."""
+        """Sağa hareket mümkün mü kontrol et."""
         for i in range(GRID_SIZE):
             for j in range(GRID_SIZE - 1):
                 if grid[i][j] != 0 and (
@@ -556,7 +567,7 @@ class Game2048:
         return False
 
     def can_move_up(self, grid) -> bool:
-        """Check if a move up is possible."""
+        """Yukarı hareket mümkün mü kontrol et."""
         for i in range(1, GRID_SIZE):
             for j in range(GRID_SIZE):
                 if grid[i][j] != 0 and (
@@ -566,7 +577,7 @@ class Game2048:
         return False
 
     def can_move_down(self, grid) -> bool:
-        """Check if a move down is possible."""
+        """Aşağı hareket mümkün mü kontrol et."""
         for i in range(GRID_SIZE - 1):
             for j in range(GRID_SIZE):
                 if grid[i][j] != 0 and (
@@ -576,22 +587,22 @@ class Game2048:
         return False
 
     def game_over(self) -> bool:
-        """Check if the game is over."""
+        """Oyunun bitip bitmediğini kontrol et."""
         if not self.can_move(self.grid):
             return True
         return False
 
     def on_closing(self):
-        """Handle the window closing event."""
+        """Pencere kapatma olayını işle."""
         self.game_running = False
         self.window.destroy()
 
     def is_terminal(self, grid: List[List[int]]) -> bool:
-        """Check if the grid is in a terminal state (no moves possible)."""
+        """Grid'in terminal durumda olup olmadığını kontrol et (hamle yapılamıyor)."""
         return not self.can_move(grid)
 
     def grid_to_tuple(self, grid: List[List[int]]) -> Tuple[Tuple[int, ...], ...]:
-        """Convert grid to hashable tuple format for memoization."""
+        """Grid'i memoization için hashable tuple formatına dönüştür."""
         return tuple(tuple(row) for row in grid)
 
     @lru_cache(maxsize=10000)
@@ -602,22 +613,22 @@ class Game2048:
         grid_tuple: Tuple[Tuple[int, ...], ...],
         score: int,
     ) -> float:
-        """Memoized version of expectimax."""
-        # Convert tuple back to list
+        """Önbelleğe alınmış expectimax versiyonu - performans için."""
+        # Tuple'ı listeye dönüştür
         grid = [list(row) for row in grid_tuple]
 
-        # Save original grid and score
+        # Orijinal grid ve skoru kaydet
         original_grid = self.grid
         original_score = self.score
 
-        # Use test grid temporarily
+        # Test grid'i geçici olarak kullan
         self.grid = grid
         self.score = score
 
-        # Run expectimax
+        # Monte Carlo Expectimax çalıştır
         result = self.monte_carlo_expectimax(depth, agent_type, self.grid)
 
-        # Restore original grid and score
+        # Orijinal grid ve skoru geri yükle
         self.grid = original_grid
         self.score = original_score
 
@@ -631,8 +642,8 @@ class Game2048:
         test_grid: List[List[int]],
         rollouts: int = 10,
     ) -> float:
-        """Monte Carlo version of expectimax algorithm with optimized rollouts."""
-        # Early termination
+        """Optimize edilmiş rollout sayısıyla Monte Carlo expectimax algoritması."""
+        # Erken sonlandırma
         if depth == 0 or self.is_terminal(test_grid):
             return self.evaluate()
 
@@ -675,9 +686,9 @@ class Game2048:
                 self.score = original_score
                 return self.evaluate()
 
-            # Use Monte Carlo sampling with weight-biased selection
+            # Ağırlık tabanlı Monte Carlo örnekleme kullan
             total_value = 0
-            probabilities = {2: 0.9, 4: 0.1}
+            probabilities = {2: 0.9, 4: 0.1}  # Taş olasılıkları
 
             # Rollout değişikliği: 15'ten 10'a düşürüldü ve hücreler önem derecesine göre seçiliyor
             # Köşeler daha önemli olduğu için köşelere yakın hücrelere öncelik ver
@@ -715,10 +726,10 @@ class Game2048:
                         depth - 1, "max", grid_tuple, self.score
                     )
 
-                    # Weight the value by probability
+                    # Değeri olasılığa göre ağırlıklandır
                     total_value += value * probabilities[new_value]
 
-            # Average the results
+            # Sonuçların ortalamasını al
             avg_value = total_value / (actual_rollouts * len(NEW_TILE_VALUES))
 
             self.grid = original_grid
@@ -726,7 +737,7 @@ class Game2048:
             return avg_value
 
     def get_best_move(self, depth: int = 3) -> Optional[Callable]:
-        """Find the best move using optimized Monte Carlo expectimax algorithm."""
+        """Optimize edilmiş Monte Carlo expectimax algoritmasını kullanarak en iyi hamleyi bul."""
         try:
             start_time = time.time()
             best_move = None
@@ -734,7 +745,7 @@ class Game2048:
             current_grid = self.clone_grid()
             original_score = self.score
 
-            # Rollout sayısını 10'a düşür
+            # Rollout sayısını 10'a düşür - performans iyileştirmesi
             rollouts = 10
 
             for move in self.get_possible_moves(current_grid):
@@ -754,13 +765,13 @@ class Game2048:
             self.grid = current_grid
             self.score = original_score
 
-            # Cache temizlemesini sadece işlem uzun sürdüğünde ve periyodik olarak yap
+            # Önbelleği sadece işlem uzun sürdüğünde ya da periyodik olarak temizle
             if time.time() - start_time > 0.5 or self.move_count % 150 == 0:
                 self.cached_expectimax.cache_clear()
 
             return best_move
         except Exception as e:
-            print(f"Error in get_best_move: {e}")
+            print(f"get_best_move'da hata oluştu: {e}")
             return None
 
 
