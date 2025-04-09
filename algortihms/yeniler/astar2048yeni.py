@@ -369,24 +369,40 @@ class Game2048:
         return best_move
 
     def move_left(self):
-        """Taşları sola kaydır ve birleştir."""
+        """
+        Taşları sola kaydırır ve mümkünse birleştirir.
+        - Bu işlem, grid'in her satırında yapılır.
+        - Sıfırlar çıkarılır, taşlar birleştirilir ve tekrar sıkıştırılır.
+        """
         return self.move(lambda row: self.compress(row), lambda row: self.merge(row))
 
     def move_right(self):
-        """Taşları sağa kaydır ve birleştir."""
+        """
+        Taşları sağa kaydırır ve mümkünse birleştirir.
+        - Bu işlem, grid'in her satırında yapılır.
+        - Satırlar ters çevrilir, işlem yapılır ve tekrar ters çevrilir.
+        """
         return self.move(
             lambda row: self.compress(row[::-1])[::-1],
             lambda row: self.merge(row[::-1])[::-1],
         )
 
     def move_up(self):
-        """Taşları yukarı kaydır ve birleştir."""
+        """
+        Taşları yukarı kaydırır ve mümkünse birleştirir.
+        - Bu işlem, grid'in her sütununda yapılır.
+        - Grid transpoze edilir, işlem yapılır ve tekrar transpoze edilir.
+        """
         return self.move_columns(
             lambda col: self.compress(col), lambda col: self.merge(col)
         )
 
     def move_down(self):
-        """Taşları aşağı kaydır ve birleştir."""
+        """
+        Taşları aşağı kaydırır ve mümkünse birleştirir.
+        - Bu işlem, grid'in her sütununda yapılır.
+        - Grid transpoze edilir, ters çevrilir, işlem yapılır ve tekrar eski haline getirilir.
+        """
         return self.move_columns(
             lambda col: self.compress(col[::-1])[::-1],
             lambda col: self.merge(col[::-1])[::-1],
@@ -421,13 +437,19 @@ class Game2048:
         return moved
 
     def compress(self, row):
-        """Sıfırları sil ve sayıları bir tarafa kaydır."""
+        """
+        Sıfırları çıkarır ve sayıları bir tarafa kaydırır.
+        - Bu işlem, bir satırdaki taşları sıkıştırarak boşlukları doldurur.
+        """
         if all(num == 0 for num in row):  # Eğer zaten boşsa işlem yapma
             return row
         return [num for num in row if num != 0] + [0] * row.count(0)
 
     def merge(self, row):
-        """Yan yana aynı olan sayıları birleştir."""
+        """
+        Yan yana eşit sayıları birleştirir.
+        - Birleştirilen taşların değeri iki katına çıkar ve skor güncellenir.
+        """
         for i in range(len(row) - 1):
             if (
                 row[i] != 0 and row[i] == row[i + 1]
@@ -438,7 +460,10 @@ class Game2048:
         return row
 
     def can_move(self):
-        """Herhangi bir hareketin mümkün olup olmadığını kontrol et."""
+        """
+        Herhangi bir hareketin mümkün olup olmadığını kontrol eder.
+        - Eğer grid'de boş hücre varsa veya birleştirilebilecek taşlar varsa, hareket mümkündür.
+        """
         # Yatay birleştirmeleri kontrol et
         for i in range(GRID_SIZE):
             for j in range(GRID_SIZE - 1):
@@ -453,7 +478,10 @@ class Game2048:
         return any(0 in row for row in self.grid)
 
     def game_over(self):
-        """Oyun sona erdiğinde çalışacak fonksiyon."""
+        """
+        Oyun sona erdiğinde çalışacak fonksiyon.
+        - Oyun sonu mesajı gösterilir ve ekran görüntüsü alınır.
+        """
         if self.run_without_gui:
             return
 

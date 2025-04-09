@@ -125,8 +125,15 @@ class Game2048:
     def evaluate(self) -> float:
         """
         Grid'in mevcut durumunu değerlendirir.
-        - Boş hücre sayısı, monotonluk, pürüzsüzlük, köşe skoru gibi faktörler dikkate alınır.
-        - Her bir heuristic, stratejik bir avantaj sağlar.
+        - Bu fonksiyon, oyunun mevcut durumunu analiz ederek bir skor döndürür.
+        - Heuristicler:
+          - Boş hücre sayısı: Daha fazla boş hücre, daha fazla hareket imkanı sağlar.
+          - Monotonluk: Büyük taşların sıralı bir şekilde yerleşmesini teşvik eder.
+          - Pürüzsüzlük: Komşu taşlar arasındaki farkın az olması tercih edilir.
+          - Köşe skoru: En büyük taşın köşede olması avantaj sağlar.
+          - Kümelenme: Büyük taşların birbirine yakın olması stratejik bir avantajdır.
+          - Birleşme potansiyeli: Taşların birleşme olasılığı.
+        - Her bir heuristic, stratejik bir avantaj sağlar ve toplam skor hesaplanır.
         """
         # Boş hücre sayısı: Daha fazla boş hücre, daha fazla hareket imkanı sağlar.
         # Monotonluk: Büyük taşların sıralı bir şekilde yerleşmesini teşvik eder.
@@ -281,9 +288,12 @@ class Game2048:
     ) -> float:
         """
         Expectimax algoritması:
-        - Max ajan en iyi hamleyi seçer.
-        - Chance ajan rastgele taş eklemeleri simüle eder.
-        - Derinlik (depth), algoritmanın kaç adım ileriye bakacağını belirler.
+        - Bu algoritma, Max ve Chance ajanlarının kararlarını simüle eder.
+        - Max ajan: En iyi hamleyi seçmek için tüm olasılıkları değerlendirir.
+        - Chance ajan: Rastgele taş eklemeleri simüle ederek olasılıkları hesaplar.
+        - Derinlik (depth): Algoritmanın kaç adım ileriye bakacağını belirler.
+        - Eğer derinlik sıfıra ulaşırsa veya terminal durumda ise, mevcut durum değerlendirilir.
+        - Max ajan, en yüksek skoru döndürürken; Chance ajan, olasılıkların ağırlıklı ortalamasını döndürür.
         """
         # Max ajan: En iyi hamleyi seçmek için tüm olasılıkları değerlendirir.
         # Chance ajan: Rastgele taş eklemeleri simüle ederek olasılıkları hesaplar.
@@ -349,7 +359,8 @@ class Game2048:
         """
         En iyi hamleyi bulur:
         - Expectimax algoritmasını kullanır.
-        - Performans için memoization ve Monte Carlo yöntemleri kullanılır.
+        - Performans için memoization ve Monte Carlo yöntemleri uygulanır.
+        - Tüm olası hamleler değerlendirilir ve en yüksek skoru veren hamle seçilir.
         """
         # En iyi hamleyi bulmak için Expectimax algoritmasını kullanır.
         # Performans için memoization ve Monte Carlo yöntemleri uygulanır.
@@ -388,7 +399,11 @@ class Game2048:
             self.window.after(500, lambda: self.take_screenshot("start"))
 
     def add_new_tile(self):
-        """Rastgele bir boş hücreye yeni bir taş ekle (2 veya 4)."""
+        """
+        Rastgele bir boş hücreye yeni bir taş ekler (2 veya 4).
+        - %90 olasılıkla 2, %10 olasılıkla 4 eklenir.
+        - Eğer boş hücre yoksa işlem yapılmaz.
+        """
         empty_cells = [
             (i, j)
             for i in range(GRID_SIZE)
@@ -401,7 +416,11 @@ class Game2048:
             self.grid[i][j] = random.choices(NEW_TILE_VALUES, weights=[0.9, 0.1])[0]
 
     def update_gui(self):
-        """Grid'in mevcut durumunu yansıtmak için GUI'yi güncelle."""
+        """
+        Grid'in mevcut durumunu yansıtmak için GUI'yi günceller.
+        - Her hücredeki değerler ve renkler güncellenir.
+        - Skor etiketi güncellenir.
+        """
         if self.run_without_gui:
             return
         for i in range(GRID_SIZE):
@@ -414,11 +433,18 @@ class Game2048:
         self.window.update_idletasks()
 
     def clone_grid(self) -> List[List[int]]:
-        """Grid'in derin bir kopyasını döndür."""
+        """
+        Grid'in derin bir kopyasını döndürür.
+        - Bu, mevcut grid üzerinde değişiklik yapmadan simülasyonlar yapmayı sağlar.
+        """
         return copy.deepcopy(self.grid)
 
     def get_possible_moves(self, grid: List[List[int]]) -> List[Callable]:
-        """Mümkün olan hamlelerin listesini döndür."""
+        """
+        Mümkün olan hamlelerin listesini döndürür.
+        - Her bir hamle, grid üzerinde bir değişiklik yapıp yapmadığına göre değerlendirilir.
+        - Eğer bir hamle grid'i değiştirmiyorsa, o hamle geçersizdir.
+        """
         moves = []
         if self.can_move_left(grid):
             moves.append(self.move_left)
@@ -431,7 +457,11 @@ class Game2048:
         return moves
 
     def take_screenshot(self, reason="move"):
-        """Oyunun mevcut durumunun ekran görüntüsünü al ve metin ekle."""
+        """
+        Oyunun mevcut durumunun ekran görüntüsünü alır ve metin ekler.
+        - Ekran görüntüsü, oyunun belirli bir aşamasını belgelemek için kullanılır.
+        - Örneğin, başlangıç durumu, orta oyun veya oyun sonu.
+        """
         if self.run_without_gui:
             return
         try:
@@ -483,7 +513,11 @@ class Game2048:
             print(f"Ekran görüntüsü alınırken hata oluştu: {e}")
 
     def schedule_ai_move(self):
-        """AI'nin bir hamle yapmasını zamanla."""
+        """
+        AI'nin bir hamle yapmasını zamanlar.
+        - Eğer oyun devam ediyorsa, belirli bir süre sonra AI bir hamle yapar.
+        - Bu, oyunun otomatik olarak oynanmasını sağlar.
+        """
         if self.run_without_gui:
             return
         if self.game_running:
@@ -507,7 +541,11 @@ class Game2048:
             self.window.after(50, self.schedule_ai_move)
 
     def ai_play(self):
-        """AI'nın bir hamle yapmasını sağla."""
+        """
+        AI'nın bir hamle yapmasını sağlar.
+        - En iyi hamle seçilir ve uygulanır.
+        - Yeni bir taş eklenir ve GUI güncellenir.
+        """
         best_move = self.get_best_move()
         if best_move:
             best_move()
@@ -515,11 +553,19 @@ class Game2048:
             self.update_gui()
 
     def move_left(self):
-        """Taşları sola kaydır."""
+        """
+        Taşları sola kaydırır ve mümkünse birleştirir.
+        - Bu işlem, grid'in her satırında yapılır.
+        - Sıfırlar çıkarılır, taşlar birleştirilir ve tekrar sıkıştırılır.
+        """
         self.move(self.grid, self.compress, self.merge, self.compress)
 
     def move_right(self):
-        """Taşları sağa kaydır."""
+        """
+        Taşları sağa kaydırır ve mümkünse birleştirir.
+        - Bu işlem, grid'in her satırında yapılır.
+        - Satırlar ters çevrilir, işlem yapılır ve tekrar ters çevrilir.
+        """
         self.move(
             self.grid,
             self.reverse,
@@ -530,7 +576,11 @@ class Game2048:
         )
 
     def move_up(self):
-        """Taşları yukarı kaydır."""
+        """
+        Taşları yukarı kaydırır ve mümkünse birleştirir.
+        - Bu işlem, grid'in her sütununda yapılır.
+        - Grid transpoze edilir, işlem yapılır ve tekrar transpoze edilir.
+        """
         self.move(
             self.grid,
             self.transpose,
@@ -541,7 +591,11 @@ class Game2048:
         )
 
     def move_down(self):
-        """Taşları aşağı kaydır."""
+        """
+        Taşları aşağı kaydırır ve mümkünse birleştirir.
+        - Bu işlem, grid'in her sütununda yapılır.
+        - Grid transpoze edilir, ters çevrilir, işlem yapılır ve tekrar eski haline getirilir.
+        """
         self.move(
             self.grid,
             self.transpose,
@@ -559,14 +613,20 @@ class Game2048:
             step(grid)
 
     def compress(self, grid):
-        """Taşları sola kaydırıp sıfırları sağa topla."""
+        """
+        Sıfırları çıkarır ve sayıları bir tarafa kaydırır.
+        - Bu işlem, bir satırdaki taşları sıkıştırarak boşlukları doldurur.
+        """
         for i in range(GRID_SIZE):
             new_row = [tile for tile in grid[i] if tile != 0]
             new_row += [0] * (GRID_SIZE - len(new_row))
             grid[i] = new_row
 
     def merge(self, grid):
-        """Grid'deki taşları birleştir."""
+        """
+        Yan yana eşit sayıları birleştirir.
+        - Birleştirilen taşların değeri iki katına çıkar ve skor güncellenir.
+        """
         for i in range(GRID_SIZE):
             for j in range(GRID_SIZE - 1):
                 if grid[i][j] == grid[i][j + 1] and grid[i][j] != 0:
@@ -584,7 +644,10 @@ class Game2048:
         grid[:] = [list(row) for row in zip(*grid)]
 
     def can_move(self, grid) -> bool:
-        """Herhangi bir hareketin mümkün olup olmadığını kontrol et."""
+        """
+        Herhangi bir hareketin mümkün olup olmadığını kontrol eder.
+        - Eğer grid'de boş hücre varsa veya birleştirilebilecek taşlar varsa, hareket mümkündür.
+        """
         for i in range(GRID_SIZE):
             for j in range(GRID_SIZE):
                 if grid[i][j] == 0:
@@ -642,16 +705,25 @@ class Game2048:
         return False
 
     def on_closing(self):
-        """Pencere kapatma olayını işle."""
+        """
+        Pencere kapatma olayını işler.
+        - Oyun durdurulur ve pencere kapatılır.
+        """
         self.game_running = False
         self.window.destroy()
 
     def is_terminal(self, grid: List[List[int]]) -> bool:
-        """Grid'in terminal durumda olup olmadığını kontrol et (hamle yapılamıyor)."""
+        """
+        Grid'in terminal durumda olup olmadığını kontrol eder.
+        - Eğer grid'de hareket yapılamıyorsa, terminal durumdadır.
+        """
         return not self.can_move(grid)
 
     def grid_to_tuple(self, grid: List[List[int]]) -> Tuple[Tuple[int, ...], ...]:
-        """Grid'i memoization için hashable tuple formatına dönüştür."""
+        """
+        Grid'i memoization için hashable tuple formatına dönüştürür.
+        - Bu, grid'in daha hızlı karşılaştırılmasını sağlar.
+        """
         return tuple(tuple(row) for row in grid)
 
     @lru_cache(maxsize=10000)
@@ -699,8 +771,11 @@ class Game2048:
     ) -> float:
         """
         Monte Carlo Expectimax:
+        - Expectimax algoritmasının bir varyasyonudur.
         - Rastgele simülasyonlar yaparak olasılıkları değerlendirir.
         - Rollout sayısı, doğruluk ve performans arasında bir denge sağlar.
+        - Bu yöntem, taşların köşelere yakın olmasını teşvik eder ve stratejik olarak taşların daha iyi yerleştirilmesini sağlar.
+        - Derinlik sıfıra ulaştığında veya terminal durumda olduğunda mevcut durum değerlendirilir.
         """
         # Monte Carlo yöntemi, rastgele örnekleme yaparak olasılıkları tahmin eder.
         # Rollout sayısı, daha fazla doğruluk için artırılabilir ancak işlem süresi uzar.
@@ -731,7 +806,6 @@ class Game2048:
                     depth - 1, "chance", grid_tuple, self.score
                 )
                 max_value = max(max_value, value)
-
             self.grid = original_grid
             self.score = original_score
             return max_value

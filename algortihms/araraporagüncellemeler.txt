@@ -10,7 +10,7 @@ Minimax Algoritması (`minimax2048.py`)
 - Derinlik 3’ten 2’ye düşürüldü.
 - Alpha-Beta Budama geliştirildi ve işlem süresi hızlandırıldı.
 - Move Ordering eklendi; en iyi hamleler önce incelenerek budama verimliliği artırıldı.
-- LRU Cache Memorization eklendi; tekrar eden hesaplamalar önlendi.
+- LRU Cache Memoization eklendi; tekrar eden hesaplamalar önlendi.
 - Her 100 hamlede bir cache temizleme mekanizması eklendi.
 - İşlem süresi düşürüldü, ortalama skor ve maksimum taş artışı sağlandı.
 
@@ -21,7 +21,7 @@ Expectimax Algoritması (`expectimax2048.py`)
 - Merge potansiyeli değerlendirme fonksiyonuna dahil edildi.
 - Boş hücre sayısının 2 katı kadar rollout yapılarak daha kapsamlı bir arama sağlandı.
 - Monte Carlo hesaplamaları optimize edildi.
-- LRU Cache Memorization eklendi; tekrar eden durumlar saklanarak hesaplamalar hızlandırıldı.
+- LRU Cache Memoization eklendi; tekrar eden durumlar saklanarak hesaplamalar hızlandırıldı.
 - Periyodik cache temizleme mekanizması eklendi.
 
 A* Algoritması (`astar2048.py`)

@@ -176,12 +176,15 @@ class Game2048:
 
     def evaluate(self) -> int:
         """
-        Heuristic Değerlendirme:
-        - **Boş Hücre Sayısı**: Daha fazla boş hücre, daha fazla hareket imkanı sağlar.
-        - **Monotonluk**: Taşların sıralı bir şekilde yerleşmesi hedeflenir.
-        - **Pürüzsüzlük**: Komşu taşlar arasındaki farkın az olması tercih edilir.
-        - **Max Taşın Konumu**: En büyük taşın köşede olması daha iyi bir stratejidir.
-        - **Birleştirme Potansiyeli**: Taşların birleşme olasılığı.
+        Grid'in mevcut durumunu değerlendirir.
+        - Bu fonksiyon, oyunun mevcut durumunu analiz ederek bir skor döndürür.
+        - Heuristicler:
+          - Boş Hücre Sayısı: Daha fazla boş hücre, daha fazla hareket imkanı sağlar.
+          - Monotonluk: Büyük taşların sıralı bir şekilde yerleşmesini teşvik eder.
+          - Pürüzsüzlük: Komşu taşlar arasındaki farkın az olması tercih edilir.
+          - Max Taşın Konumu: En büyük taşın köşede olması daha iyi bir stratejidir.
+          - Birleştirme Potansiyeli: Taşların birleşme olasılığı.
+        - Her bir heuristic, stratejik bir avantaj sağlar ve toplam skor hesaplanır.
         """
         # Analiz sonuçlarına göre ayarlanmış heuristik ağırlıkları
         empty_cell_score = (
@@ -212,6 +215,7 @@ class Game2048:
         """
         Birleştirme Potansiyeli Heuristic'i:
         - Taşların birleşme olasılığını değerlendirir.
+        - Yatay ve dikey olarak birleşebilecek taşları analiz eder.
         """
         merge_score = 0
 
@@ -233,6 +237,7 @@ class Game2048:
         """
         Monotonluk Heuristic'i:
         - Taşların sıralı bir şekilde yerleşmesini ölçer.
+        - Soldan sağa ve yukarıdan aşağıya azalan bir düzen tercih edilir.
         """
         mono_score = 0
 
@@ -256,6 +261,7 @@ class Game2048:
         """
         Pürüzsüzlük Heuristic'i:
         - Komşu taşlar arasındaki farkın az olması hedeflenir.
+        - Daha pürüzsüz bir grid, daha iyi bir strateji anlamına gelir.
         """
         smoothness = 0
 
@@ -273,6 +279,7 @@ class Game2048:
         """
         Max Taşın Konumu Heuristic'i:
         - En büyük taşın köşede olması daha iyi bir stratejidir.
+        - Köşede değilse, kenarda olması da bir miktar avantaj sağlar.
         """
         max_val = 0
         max_i, max_j = 0, 0
@@ -305,6 +312,7 @@ class Game2048:
         Hill Climbing Algoritması:
         - En iyi hamleyi seçer.
         - **Rastgele Yeniden Başlatma**: Yerel maksimumlardan kaçınmak için %15 olasılıkla rastgele seçim yapar.
+        - Tüm olası hamleler değerlendirilir ve en yüksek skoru veren hamle seçilir.
         """
         best_move = None
         best_score = float("-inf")
@@ -412,24 +420,40 @@ class Game2048:
             self.game_over()
 
     def move_left(self) -> bool:
-        """Taşları sola kaydır ve mümkünse birleştir."""
+        """
+        Taşları sola kaydırır ve mümkünse birleştirir.
+        - Bu işlem, grid'in her satırında yapılır.
+        - Sıfırlar çıkarılır, taşlar birleştirilir ve tekrar sıkıştırılır.
+        """
         return self.move(lambda row: self.compress(row), lambda row: self.merge(row))
 
     def move_right(self) -> bool:
-        """Taşları sağa kaydır ve mümkünse birleştir."""
+        """
+        Taşları sağa kaydırır ve mümkünse birleştirir.
+        - Bu işlem, grid'in her satırında yapılır.
+        - Satırlar ters çevrilir, işlem yapılır ve tekrar ters çevrilir.
+        """
         return self.move(
             lambda row: self.compress(row[::-1])[::-1],
             lambda row: self.merge(row[::-1])[::-1],
         )
 
     def move_up(self) -> bool:
-        """Taşları yukarı kaydır ve mümkünse birleştir."""
+        """
+        Taşları yukarı kaydırır ve mümkünse birleştirir.
+        - Bu işlem, grid'in her sütununda yapılır.
+        - Grid transpoze edilir, işlem yapılır ve tekrar transpoze edilir.
+        """
         return self.move_columns(
             lambda col: self.compress(col), lambda col: self.merge(col)
         )
 
     def move_down(self) -> bool:
-        """Taşları aşağı kaydır ve mümkünse birleştir."""
+        """
+        Taşları aşağı kaydırır ve mümkünse birleştirir.
+        - Bu işlem, grid'in her sütununda yapılır.
+        - Grid transpoze edilir, ters çevrilir, işlem yapılır ve tekrar eski haline getirilir.
+        """
         return self.move_columns(
             lambda col: self.compress(col[::-1])[::-1],
             lambda col: self.merge(col[::-1])[::-1],
@@ -463,11 +487,17 @@ class Game2048:
         return moved
 
     def compress(self, row: List[int]) -> List[int]:
-        """Sıfırları çıkar ve sayıları bir tarafa kaydır."""
+        """
+        Sıfırları çıkarır ve sayıları bir tarafa kaydırır.
+        - Bu işlem, bir satırdaki taşları sıkıştırarak boşlukları doldurur.
+        """
         return [num for num in row if num != 0] + [0] * row.count(0)
 
     def merge(self, row: List[int]) -> List[int]:
-        """Yan yana eşit sayıları birleştir."""
+        """
+        Yan yana eşit sayıları birleştirir.
+        - Birleştirilen taşların değeri iki katına çıkar ve skor güncellenir.
+        """
         for i in range(len(row) - 1):
             if row[i] != 0 and row[i] == row[i + 1]:
                 row[i] *= 2
@@ -476,7 +506,10 @@ class Game2048:
         return row
 
     def can_move(self) -> bool:
-        """Herhangi bir hareketin mümkün olup olmadığını kontrol et."""
+        """
+        Herhangi bir hareketin mümkün olup olmadığını kontrol eder.
+        - Eğer grid'de boş hücre varsa veya birleştirilebilecek taşlar varsa, hareket mümkündür.
+        """
         # Boş hücreler için kontrol
         if any(0 in row for row in self.grid):
             return True
@@ -496,7 +529,10 @@ class Game2048:
         return False
 
     def game_over(self):
-        """Oyun bittiğinde çalışacak fonksiyon."""
+        """
+        Oyun sona erdiğinde çalışacak fonksiyon.
+        - Oyun sonu mesajı gösterilir ve ekran görüntüsü alınır.
+        """
         if self.run_without_gui:
             return
 
