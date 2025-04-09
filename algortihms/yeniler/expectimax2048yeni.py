@@ -123,7 +123,16 @@ class Game2048:
             self.game_running = False
 
     def evaluate(self) -> float:
-        """Mevcut tahta durumunu birden çok heuristic kullanarak değerlendir."""
+        """
+        Grid'in mevcut durumunu değerlendirir.
+        - Boş hücre sayısı, monotonluk, pürüzsüzlük, köşe skoru gibi faktörler dikkate alınır.
+        - Her bir heuristic, stratejik bir avantaj sağlar.
+        """
+        # Boş hücre sayısı: Daha fazla boş hücre, daha fazla hareket imkanı sağlar.
+        # Monotonluk: Büyük taşların sıralı bir şekilde yerleşmesini teşvik eder.
+        # Pürüzsüzlük: Komşu taşlar arasındaki farkın az olması tercih edilir.
+        # Köşe skoru: En büyük taşın köşede olması avantaj sağlar.
+        # Kümelenme: Büyük taşların birbirine yakın olması stratejik bir avantajdır.
         empty_count = sum(row.count(0) for row in self.grid) * 10000  # Boş hücre bonusu
         mono_score = self._calculate_monotonicity()  # Monotonluk skoru
         smooth_score = self._calculate_smoothness()  # Pürüzsüzlük skoru
@@ -147,7 +156,12 @@ class Game2048:
         )
 
     def _calculate_monotonicity(self) -> float:
-        """Grid'in ne kadar monoton (sıralı) olduğunu hesapla."""
+        """
+        Monotonluk heuristic'i:
+        - Taşların sıralı bir şekilde yerleşmesini ölçer.
+        - Büyük taşların bir köşede toplanmasını teşvik eder.
+        """
+        # Yatay ve dikey olarak taşların sıralı bir şekilde yerleşmesini kontrol eder.
         mono_score = 0
         for i in range(GRID_SIZE):
             for j in range(GRID_SIZE - 1):
@@ -162,7 +176,12 @@ class Game2048:
         return mono_score
 
     def _calculate_smoothness(self) -> float:
-        """Grid'in pürüzsüzlüğünü hesapla (komşu hücreler arası fark)."""
+        """
+        Pürüzsüzlük heuristic'i:
+        - Komşu taşlar arasındaki farkın az olması hedeflenir.
+        - Daha pürüzsüz bir grid, daha iyi bir strateji anlamına gelir.
+        """
+        # Komşu taşlar arasındaki farkları hesaplar ve toplam farkı azaltmayı hedefler.
         smoothness = 0
         for i in range(GRID_SIZE):
             for j in range(GRID_SIZE):
@@ -184,7 +203,13 @@ class Game2048:
         return max(corners) * 2.0  # Köşedeki en yüksek değere bonus
 
     def _calculate_tile_clustering(self) -> float:
-        """Büyük taşların ne kadar iyi kümelendiğini hesapla."""
+        """
+        Kümelenme heuristic'i:
+        - Büyük taşların birbirine yakın olması avantaj sağlar.
+        - Taşların ağırlık merkezine olan uzaklıkları hesaplanır.
+        """
+        # Taşların ağırlık merkezine olan uzaklıklarını hesaplar.
+        # Büyük taşların birbirine yakın olması stratejik bir avantaj sağlar.
         clustering_score = 0
 
         # Taşların değerleriyle ağırlıklandırılmış ortalama pozisyonu
@@ -214,7 +239,12 @@ class Game2048:
         return clustering_score
 
     def _calculate_empty_tile_ratio(self) -> float:
-        """Boş hücre oranını hesapla (boş hücre/dolu hücre)."""
+        """
+        Boş hücre oranı:
+        - Boş hücrelerin dolu hücrelere oranını hesaplar.
+        - Daha fazla boş hücre, daha fazla hareket imkanı sağlar.
+        """
+        # Boş hücrelerin dolu hücrelere oranını hesaplar.
         empty_count = sum(row.count(0) for row in self.grid)
         non_empty_count = GRID_SIZE * GRID_SIZE - empty_count
 
@@ -224,7 +254,12 @@ class Game2048:
         return empty_count / (non_empty_count + 1)  # +1 sıfıra bölünmeyi önlemek için
 
     def _calculate_merge_potential(self) -> float:
-        """Tahtadaki birleştirme potansiyelini hesapla."""
+        """
+        Birleştirme potansiyeli:
+        - Yatay ve dikey olarak birleşebilecek taşları değerlendirir.
+        - Birleşme potansiyeli, daha yüksek skor elde etme şansını artırır.
+        """
+        # Yatay ve dikey olarak birleşebilecek taşları değerlendirir.
         merge_score = 0
 
         # Yatay birleştirme potansiyelini kontrol et
@@ -244,7 +279,15 @@ class Game2048:
     def expectimax(
         self, depth: int, agent_type: str, test_grid: List[List[int]]
     ) -> float:
-        """Expectimax algoritması uygula - şans faktörünü hesaba katan üç tip düğüm."""
+        """
+        Expectimax algoritması:
+        - Max ajan en iyi hamleyi seçer.
+        - Chance ajan rastgele taş eklemeleri simüle eder.
+        - Derinlik (depth), algoritmanın kaç adım ileriye bakacağını belirler.
+        """
+        # Max ajan: En iyi hamleyi seçmek için tüm olasılıkları değerlendirir.
+        # Chance ajan: Rastgele taş eklemeleri simüle ederek olasılıkları hesaplar.
+        # Derinlik sıfıra ulaştığında veya terminal durumda olduğunda değerlendirme yapılır.
         if depth == 0:
             return self.evaluate()
 
@@ -303,7 +346,13 @@ class Game2048:
             return avg_value
 
     def get_best_move(self, depth: int = 3) -> Optional[Callable]:
-        """Expectimax algoritmasını kullanarak en iyi hamleyi bul."""
+        """
+        En iyi hamleyi bulur:
+        - Expectimax algoritmasını kullanır.
+        - Performans için memoization ve Monte Carlo yöntemleri kullanılır.
+        """
+        # En iyi hamleyi bulmak için Expectimax algoritmasını kullanır.
+        # Performans için memoization ve Monte Carlo yöntemleri uygulanır.
         try:
             best_move = None
             max_value = float("-inf")
@@ -613,7 +662,13 @@ class Game2048:
         grid_tuple: Tuple[Tuple[int, ...], ...],
         score: int,
     ) -> float:
-        """Önbelleğe alınmış expectimax versiyonu - performans için."""
+        """
+        Önbelleğe alınmış Expectimax:
+        - Memoization ile daha önce hesaplanmış sonuçları saklar.
+        - Performansı artırır ve tekrar hesaplamaları önler.
+        """
+        # Memoization: Daha önce hesaplanmış sonuçları saklayarak performansı artırır.
+        # LRU Cache: En son kullanılan sonuçları saklar ve belleği verimli kullanır.
         # Tuple'ı listeye dönüştür
         grid = [list(row) for row in grid_tuple]
 
@@ -642,7 +697,15 @@ class Game2048:
         test_grid: List[List[int]],
         rollouts: int = 10,
     ) -> float:
-        """Optimize edilmiş rollout sayısıyla Monte Carlo expectimax algoritması."""
+        """
+        Monte Carlo Expectimax:
+        - Rastgele simülasyonlar yaparak olasılıkları değerlendirir.
+        - Rollout sayısı, doğruluk ve performans arasında bir denge sağlar.
+        """
+        # Monte Carlo yöntemi, rastgele örnekleme yaparak olasılıkları tahmin eder.
+        # Rollout sayısı, daha fazla doğruluk için artırılabilir ancak işlem süresi uzar.
+        # Monte Carlo rollout'lar, taşların köşelere yakın olmasını teşvik eder.
+        # Bu, stratejik olarak taşların daha iyi yerleştirilmesini sağlar.
         # Erken sonlandırma
         if depth == 0 or self.is_terminal(test_grid):
             return self.evaluate()

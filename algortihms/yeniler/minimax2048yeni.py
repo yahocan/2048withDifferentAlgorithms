@@ -9,8 +9,9 @@ import pyautogui
 from PIL import Image, ImageDraw, ImageFont
 from functools import lru_cache
 import time
-import multiprocessing
-from multiprocessing import Pool
+
+# import multiprocessing
+# from multiprocessing import Pool
 
 GRID_SIZE = 4
 NEW_TILE_VALUES = [2, 4]
@@ -34,6 +35,8 @@ FONT = ("Verdana", 24, "bold")
 
 class Game2048:
     def __init__(self, run_without_gui=False):
+        # Oyun sınıfının başlangıç ayarları yapılır.
+        # GUI ile veya GUI olmadan çalıştırılabilir.
         self.run_without_gui = run_without_gui
         self.grid = [[0] * GRID_SIZE for _ in range(GRID_SIZE)]
         self.cells = []
@@ -57,7 +60,7 @@ class Game2048:
             self.start_game()
 
     def run(self):
-        """GUI olmadan oyunu çalıştır ve final skoru ile max değeri döndür."""
+        # GUI olmadan oyunu çalıştırır ve final skoru ile maksimum değeri döndürür.
         if not self.run_without_gui:
             return self.score, max(max(row) for row in self.grid)
 
@@ -76,7 +79,7 @@ class Game2048:
         return self.score, max_tile
 
     def init_gui(self):
-        """Oyunun grafik arayüzünü başlat."""
+        # Oyunun grafik arayüzünü başlatır.
         if self.run_without_gui:
             return
 
@@ -121,14 +124,13 @@ class Game2048:
             self.game_running = False
 
     def start_game(self):
-        """Oyunu başlat - 2 tane başlangıç taşı ekle."""
+        # Oyunu başlatır ve başlangıçta iki taş ekler.
         self.add_new_tile()
         self.add_new_tile()
         self.update_gui()
 
     def add_new_tile(self) -> bool:
-        """Rastgele bir boş hücreye yeni bir taş ekle (2 veya 4).
-        Başarılıysa True, boş hücre yoksa False döndürür."""
+        # Rastgele bir boş hücreye yeni bir taş ekler (2 veya 4).
         empty_cells = [
             (i, j)
             for i in range(GRID_SIZE)
@@ -142,7 +144,7 @@ class Game2048:
         return False
 
     def update_gui(self):
-        """Arayüzü güncelle - grid değerlerini ve skoru göster."""
+        # Grafik arayüzünü günceller ve grid değerlerini gösterir.
         if self.run_without_gui:
             return
 
@@ -159,11 +161,11 @@ class Game2048:
             self.game_running = False
 
     def clone_grid(self) -> List[List[int]]:
-        """Grid'in derin bir kopyasını oluştur."""
+        # Grid'in derin bir kopyasını oluşturur.
         return copy.deepcopy(self.grid)
 
     def get_possible_moves(self, test_grid: List[List[int]]) -> List[Callable]:
-        """Belirli bir grid durumu için tüm olası hareketleri al."""
+        # Belirli bir grid durumu için tüm olası hareketleri döndürür.
         moves = []
         original_grid = self.grid
         original_score = self.score
@@ -180,7 +182,8 @@ class Game2048:
         return moves
 
     def evaluate(self) -> int:
-        """Mevcut tahta durumunu birden çok heuristic kullanarak değerlendir."""
+        # Grid'in mevcut durumunu değerlendirir.
+        # Heuristicler: boş hücre sayısı, monotonluk, pürüzsüzlük, kümelenme, max taşın konumu.
         # Temel heuristic: boş hücre sayısı
         empty_cell_score = sum(row.count(0) for row in self.grid) * 100
 
@@ -199,7 +202,8 @@ class Game2048:
         )
 
     def _calculate_monotonicity(self) -> float:
-        """Grid'in ne kadar monoton (sıralı) olduğunu hesapla."""
+        # Monotonluk heuristic'i: Taşların sıralı bir şekilde yerleşmesini ölçer.
+        # Soldan sağa ve yukarıdan aşağıya azalan bir düzen tercih edilir.
         mono_score = 0
 
         # Yatay monotonikliği kontrol et (soldan sağa azalan)
@@ -219,7 +223,8 @@ class Game2048:
         return mono_score
 
     def _calculate_smoothness(self) -> float:
-        """Grid'in ne kadar pürüzsüz olduğunu hesapla (komşu taşlar arasındaki fark)."""
+        # Pürüzsüzlük heuristic'i: Komşu taşlar arasındaki farkın az olması hedeflenir.
+        # Daha pürüzsüz bir grid, daha iyi bir strateji anlamına gelir.
         smoothness = 0
 
         for i in range(GRID_SIZE):
@@ -233,7 +238,8 @@ class Game2048:
         return smoothness
 
     def _calculate_clustering(self) -> float:
-        """Büyük taşların ne kadar iyi kümelendiğini hesapla."""
+        # Kümelenme heuristic'i: Büyük taşların birbirine yakın olması avantaj sağlar.
+        # Taşların ağırlık merkezine olan uzaklıkları hesaplanır.
         clustering_score = 0
 
         # Taşların değerleriyle ağırlıklandırılmış ortalama pozisyonunu bul
@@ -263,7 +269,8 @@ class Game2048:
         return clustering_score
 
     def _evaluate_max_tile_placement(self) -> int:
-        """Grid üzerindeki en büyük taşın konumunu değerlendir."""
+        # Max taşın konumu heuristic'i: En büyük taşın köşede olması daha iyi bir stratejidir.
+        # Köşede değilse, kenarda olması da bir miktar avantaj sağlar.
         max_val = 0
         max_i, max_j = 0, 0
 
@@ -291,7 +298,7 @@ class Game2048:
         return 0  # Merkez yerleşimi için bonus yok
 
     def is_terminal(self, grid: List[List[int]]) -> bool:
-        """Grid'in terminal durumda olup olmadığını kontrol et (hamle yapılamıyor)."""
+        # Grid'in terminal durumda olup olmadığını kontrol eder (hamle yapılamıyor).
         # Boş hücre var mı kontrol et
         if any(0 in row for row in grid):
             return False
@@ -313,7 +320,7 @@ class Game2048:
     def evaluate_move_for_sorting(
         self, move: Callable, test_grid: List[List[int]]
     ) -> float:
-        """Hamleleri sıralamak için hızlı değerlendirme yap."""
+        # Hamleleri sıralamak için hızlı bir değerlendirme yapar.
         temp_grid = copy.deepcopy(test_grid)
         original_grid = self.grid
         self.grid = temp_grid
@@ -332,7 +339,7 @@ class Game2048:
         return empty_count * 10 + max_value + corner_score
 
     def get_sorted_moves(self, test_grid: List[List[int]]) -> List[Callable]:
-        """Heuristic değerlendirmeye göre sıralanmış olası hareketleri al (en iyisi önce)."""
+        # Heuristic değerlendirmeye göre sıralanmış olası hareketleri döndürür.
         possible_moves = self.get_possible_moves(test_grid)
 
         # Hareketleri hızlı bir değerlendirmeye göre sırala (en iyisi önce)
@@ -343,11 +350,10 @@ class Game2048:
         )
 
     def grid_to_tuple(self, grid: List[List[int]]) -> Tuple[Tuple[int, ...], ...]:
-        """Grid'i memoization için hashable tuple formatına dönüştür."""
+        # Grid'i memoization için hashable tuple formatına dönüştürür.
         return tuple(tuple(row) for row in grid)
 
-    # Memoization için lru_cache ile minimax'ın önbelleğe alınmış versiyonu
-    @lru_cache(maxsize=1000)  # 10000'den 1000'e düşürüldü, bellek optimize
+    @lru_cache(maxsize=1000)
     def cached_minimax(
         self,
         depth: int,
@@ -357,7 +363,8 @@ class Game2048:
         grid_tuple: Tuple[Tuple[int, ...], ...],
         score: int,
     ) -> float:
-        """Minimax'ın önbelleğe alınmış versiyonu."""
+        # Önbelleğe alınmış minimax algoritması.
+        # Memoization ile performansı artırır.
         # Tuple'ı listeye dönüştür
         grid = [list(row) for row in grid_tuple]
 
@@ -386,7 +393,8 @@ class Game2048:
         maximizing_player: bool,
         test_grid: List[List[int]],
     ) -> float:
-        """Alpha-beta pruning ve erken sonlandırma ile optimize edilmiş minimax algoritması."""
+        # Minimax algoritması: En iyi hamleyi bulmak için rekabetçi bir ortamda kullanılır.
+        # Alpha-beta pruning ile optimize edilmiştir.
         # Erken sonlandırma kontrolü
         if depth == 0 or self.is_terminal(test_grid):
             return self.evaluate()
@@ -458,7 +466,7 @@ class Game2048:
             return min_eval
 
     def parallel_process_move(self, move, grid, depth):
-        """Pickle sorunları olmadan paralel hamle değerlendirmesi için değiştirilmiş yardımcı fonksiyon."""
+        # Paralel işlem için yardımcı fonksiyon.
         # Multiprocessing'e self geçmeden tek bir hamle değerlendirmesini işle
         temp_grid = copy.deepcopy(grid)
 
@@ -477,10 +485,9 @@ class Game2048:
 
         return (move, result)
 
-    def get_best_move(
-        self, depth: int = 2
-    ) -> Optional[Callable]:  # derinlik 3'ten 2'ye düşürüldü, performans için
-        """Paralel işleme olmadan optimize edilmiş minimax kullanarak en iyi hamleyi al."""
+    def get_best_move(self, depth: int = 2) -> Optional[Callable]:
+        # En iyi hamleyi bulur.
+        # Minimax algoritmasını kullanır.
         try:
             best_move = None
             max_eval = float("-inf")
@@ -526,7 +533,7 @@ class Game2048:
             return None
 
     def schedule_ai_move(self):
-        """Oyun hala çalışıyorsa bir sonraki AI hamlesini zamanla."""
+        # Oyun hala çalışıyorsa bir sonraki AI hamlesini zamanlar.
         if self.run_without_gui:
             return
 
@@ -534,7 +541,7 @@ class Game2048:
             self.ai_task = self.window.after(50, self.ai_play)
 
     def take_screenshot(self, filename: str, text: str):
-        """Oyun penceresinin ekran görüntüsünü al ve metin ekle."""
+        # Oyun penceresinin ekran görüntüsünü alır ve metin ekler.
         if self.run_without_gui:
             return
 
@@ -552,7 +559,7 @@ class Game2048:
         screenshot.save(filename)
 
     def ai_play(self):
-        """AI hamlesini yap ve oyun hala çalışıyorsa bir sonrakini zamanla."""
+        # AI hamlesini yapar ve oyun hala çalışıyorsa bir sonrakini zamanlar.
         if self.run_without_gui:
             return
 
@@ -584,31 +591,31 @@ class Game2048:
             self.game_over()
 
     def move_left(self) -> bool:
-        """Taşları sola kaydır ve mümkünse birleştir."""
+        # Taşları sola kaydırır ve mümkünse birleştirir.
         return self.move(lambda row: self.compress(row), lambda row: self.merge(row))
 
     def move_right(self) -> bool:
-        """Taşları sağa kaydır ve mümkünse birleştir."""
+        # Taşları sağa kaydırır ve mümkünse birleştirir.
         return self.move(
             lambda row: self.compress(row[::-1])[::-1],
             lambda row: self.merge(row[::-1])[::-1],
         )
 
     def move_up(self) -> bool:
-        """Taşları yukarı kaydır ve mümkünse birleştir."""
+        # Taşları yukarı kaydırır ve mümkünse birleştirir.
         return self.move_columns(
             lambda col: self.compress(col), lambda col: self.merge(col)
         )
 
     def move_down(self) -> bool:
-        """Taşları aşağı kaydır ve mümkünse birleştir."""
+        # Taşları aşağı kaydırır ve mümkünse birleştirir.
         return self.move_columns(
             lambda col: self.compress(col[::-1])[::-1],
             lambda col: self.merge(col[::-1])[::-1],
         )
 
     def move(self, compress_fn: Callable, merge_fn: Callable) -> bool:
-        """Yatay hareketler için genel hareket fonksiyonu."""
+        # Yatay hareketler için genel hareket fonksiyonu.
         moved = False
         for i in range(GRID_SIZE):
             original = self.grid[i][:]
@@ -621,7 +628,7 @@ class Game2048:
         return moved
 
     def move_columns(self, compress_fn: Callable, merge_fn: Callable) -> bool:
-        """Dikey hareketler için genel hareket fonksiyonu."""
+        # Dikey hareketler için genel hareket fonksiyonu.
         moved = False
         for j in range(GRID_SIZE):
             original = [self.grid[i][j] for i in range(GRID_SIZE)]
@@ -635,11 +642,11 @@ class Game2048:
         return moved
 
     def compress(self, row: List[int]) -> List[int]:
-        """Sıfırları çıkar ve sayıları bir tarafa kaydır."""
+        # Sıfırları çıkarır ve sayıları bir tarafa kaydırır.
         return [num for num in row if num != 0] + [0] * row.count(0)
 
     def merge(self, row: List[int]) -> List[int]:
-        """Yan yana eşit sayıları birleştir."""
+        # Yan yana eşit sayıları birleştirir.
         for i in range(len(row) - 1):
             if row[i] != 0 and row[i] == row[i + 1]:
                 row[i] *= 2
@@ -648,7 +655,7 @@ class Game2048:
         return row
 
     def can_move(self) -> bool:
-        """Herhangi bir hareketin mümkün olup olmadığını kontrol et."""
+        # Herhangi bir hareketin mümkün olup olmadığını kontrol eder.
         # Boş hücreler için kontrol et
         if any(0 in row for row in self.grid):
             return True
@@ -668,6 +675,7 @@ class Game2048:
         return False
 
     def game_over(self):
+        # Oyun sona erdiğinde çalışacak fonksiyon.
         if self.run_without_gui:
             return
 
@@ -689,7 +697,7 @@ class Game2048:
             print(f"Game over gösterilirken hata oluştu: {e}")
 
     def on_closing(self):
-        """Pencere kapatma olayını işle."""
+        # Pencere kapatma olayını işler.
         self.game_running = False
         if self.ai_task:
             self.window.after_cancel(self.ai_task)

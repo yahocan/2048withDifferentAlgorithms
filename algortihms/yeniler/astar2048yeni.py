@@ -227,7 +227,11 @@ class Game2048:
         return None, None
 
     def heuristic_corner_max_tile(self):
-        """En büyük değerin köşede olmasını teşvik eden heuristik."""
+        """
+        Köşe Skoru Heuristic'i:
+        - En büyük taşın köşede olması durumunda yüksek puan verir.
+        - Bu, taşların stratejik olarak köşelerde toplanmasını teşvik eder.
+        """
         max_tile = max(max(row) for row in self.grid)  # En yüksek değeri bul
         corners = {
             (0, 0),
@@ -244,7 +248,11 @@ class Game2048:
         return 0  # Max değer köşede değilse bonus yok
 
     def heuristic_monotonicity(self):
-        """Gridin ne kadar monoton (sıralı) olduğunu hesapla."""
+        """
+        Monotonluk Heuristic'i:
+        - Taşların sıralı bir şekilde yerleşmesini ölçer.
+        - Soldan sağa ve yukarıdan aşağıya azalan bir düzen tercih edilir.
+        """
         mono_score = 0
 
         # Yatay monotonikliği kontrol et (soldan sağa azalan)
@@ -264,7 +272,11 @@ class Game2048:
         return mono_score
 
     def heuristic_smoothness(self):
-        """Gridin ne kadar smooth (pürüzsüz) olduğunu hesapla - komşu değerler arası fark."""
+        """
+        Pürüzsüzlük Heuristic'i:
+        - Komşu taşlar arasındaki farkın az olması hedeflenir.
+        - Daha pürüzsüz bir grid, daha iyi bir strateji anlamına gelir.
+        """
         smoothness = 0
 
         for i in range(GRID_SIZE):
@@ -278,7 +290,11 @@ class Game2048:
         return smoothness
 
     def heuristic_tile_clustering(self):
-        """Büyük taşların ne kadar kümelenebildiğini hesapla."""
+        """
+        Kümelenme Heuristic'i:
+        - Büyük taşların birbirine yakın olması avantaj sağlar.
+        - Taşların ağırlık merkezine olan uzaklıkları hesaplanır.
+        """
         clustering_score = 0
 
         # Taşların değerleriyle ağırlıklandırılmış ortalama pozisyonunu bul
@@ -308,7 +324,17 @@ class Game2048:
         return clustering_score
 
     def a_star_best_move(self):
-        """A* algoritması kullanarak en iyi hamleyi belirle."""
+        """
+        A* Algoritması:
+        - **Maliyet Fonksiyonu**: Her hamle için bir maliyet hesaplar.
+        - **Heuristic'ler**:
+          - Köşe Skoru: En büyük taşın köşede olması avantaj sağlar.
+          - Boş Hücre Sayısı: Daha fazla boş hücre, daha fazla hareket imkanı sağlar.
+          - Monotonluk: Taşların sıralı bir şekilde yerleşmesi hedeflenir.
+          - Pürüzsüzlük: Komşu taşlar arasındaki farkın az olması tercih edilir.
+          - Kümelenme: Büyük taşların birbirine yakın olması stratejik bir avantajdır.
+        - A* algoritması, en düşük maliyetli yolu bulmak için kullanılır.
+        """
         possible_moves = ["Up", "Down", "Left", "Right"]
         best_move = None
         best_score = -1

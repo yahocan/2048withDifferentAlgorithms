@@ -175,7 +175,14 @@ class Game2048:
         return moves
 
     def evaluate(self) -> int:
-        """Mevcut tahta durumunu birden çok heuristic kullanarak değerlendir."""
+        """
+        Heuristic Değerlendirme:
+        - **Boş Hücre Sayısı**: Daha fazla boş hücre, daha fazla hareket imkanı sağlar.
+        - **Monotonluk**: Taşların sıralı bir şekilde yerleşmesi hedeflenir.
+        - **Pürüzsüzlük**: Komşu taşlar arasındaki farkın az olması tercih edilir.
+        - **Max Taşın Konumu**: En büyük taşın köşede olması daha iyi bir stratejidir.
+        - **Birleştirme Potansiyeli**: Taşların birleşme olasılığı.
+        """
         # Analiz sonuçlarına göre ayarlanmış heuristik ağırlıkları
         empty_cell_score = (
             sum(row.count(0) for row in self.grid) * 200
@@ -202,7 +209,10 @@ class Game2048:
         )
 
     def _calculate_merge_potential(self) -> float:
-        """Tahtadaki birleştirme potansiyelini hesapla."""
+        """
+        Birleştirme Potansiyeli Heuristic'i:
+        - Taşların birleşme olasılığını değerlendirir.
+        """
         merge_score = 0
 
         # Yatay birleştirme potansiyeli kontrolü
@@ -220,7 +230,10 @@ class Game2048:
         return merge_score
 
     def _calculate_monotonicity(self) -> float:
-        """Grid'in ne kadar monoton (sıralı) olduğunu hesapla."""
+        """
+        Monotonluk Heuristic'i:
+        - Taşların sıralı bir şekilde yerleşmesini ölçer.
+        """
         mono_score = 0
 
         # Yatay monotonikliği kontrol et (soldan sağa azalan)
@@ -240,7 +253,10 @@ class Game2048:
         return mono_score
 
     def _calculate_smoothness(self) -> float:
-        """Grid'in pürüzsüzlüğünü hesapla (komşu taşlar arasındaki fark)."""
+        """
+        Pürüzsüzlük Heuristic'i:
+        - Komşu taşlar arasındaki farkın az olması hedeflenir.
+        """
         smoothness = 0
 
         for i in range(GRID_SIZE):
@@ -254,7 +270,10 @@ class Game2048:
         return smoothness
 
     def _evaluate_max_tile_placement(self) -> int:
-        """Grid üzerindeki en büyük taşın konumunu değerlendir."""
+        """
+        Max Taşın Konumu Heuristic'i:
+        - En büyük taşın köşede olması daha iyi bir stratejidir.
+        """
         max_val = 0
         max_i, max_j = 0, 0
 
@@ -282,7 +301,11 @@ class Game2048:
         return 0  # Merkezdeyse bonus yok
 
     def get_best_move(self) -> Optional[Callable]:
-        """Hill Climbing algoritması ve rastgele yeniden başlatma ile en iyi hamleyi bul."""
+        """
+        Hill Climbing Algoritması:
+        - En iyi hamleyi seçer.
+        - **Rastgele Yeniden Başlatma**: Yerel maksimumlardan kaçınmak için %15 olasılıkla rastgele seçim yapar.
+        """
         best_move = None
         best_score = float("-inf")
         current_grid = self.clone_grid()
